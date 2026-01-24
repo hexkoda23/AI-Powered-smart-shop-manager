@@ -11,6 +11,8 @@ export default function StockPage() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [restockItem, setRestockItem] = useState<Item | null>(null);
+  const [restockQty, setRestockQty] = useState<number>(0);
   const [formData, setFormData] = useState({
     name: '',
     current_stock: 0,
@@ -77,6 +79,35 @@ export default function StockPage() {
     } catch (error) {
       console.error('Failed to delete item:', error);
       alert('Failed to delete item. Please try again.');
+    }
+  };
+
+  const openRestock = (item: Item) => {
+    setRestockItem(item);
+    setRestockQty(0);
+  };
+
+  const submitRestock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockItem) return;
+    if (restockQty <= 0) {
+      alert('Enter a quantity greater than 0');
+      return;
+    }
+    setLoading(true);
+    try {
+      await itemsApi.update(restockItem.id, {
+        current_stock: restockItem.current_stock + restockQty,
+      });
+      setRestockItem(null);
+      setRestockQty(0);
+      await loadItems();
+      alert('Stock updated successfully!');
+    } catch (error: any) {
+      console.error('Failed to restock item:', error);
+      alert(error.response?.data?.detail || 'Failed to restock. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -241,6 +272,46 @@ export default function StockPage() {
           </div>
         )}
 
+        {/* Restock Dialog */}
+        {restockItem && (
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 mb-8 border border-transparent dark:border-slate-800">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Restock {restockItem.name}
+            </h2>
+            <form onSubmit={submitRestock} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
+                  Quantity to add
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(parseInt(e.target.value) || 0)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-slate-950 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setRestockItem(null)}
+                  className="px-6 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-950 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Updating...' : 'Add Stock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Stock List */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">All Items</h2>
@@ -315,6 +386,12 @@ export default function StockPage() {
                               className="text-primary-600 hover:text-primary-900"
                             >
                               <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => openRestock(item)}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Restock
                             </button>
                             <button
                               onClick={() => handleDelete(item.id)}
