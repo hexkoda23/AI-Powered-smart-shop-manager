@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ShoppingBag, BarChart3, Package, MessageSquare, Moon, Sun } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useTheme } from '@/components/ThemeProvider';
+import { useTheme } from './ThemeProvider';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: BarChart3 },

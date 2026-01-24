@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar';
+import Navbar from '../../components/Navbar';
 import { itemsApi, Item } from '../../lib/api';
 import { Plus, Edit2, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
