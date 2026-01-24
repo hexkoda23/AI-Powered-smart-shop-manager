@@ -86,7 +86,7 @@ export default function AssistantPage() {
             <Sparkles className="w-6 h-6 text-primary-600 mr-2" />
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Shop Assistant</h1>
           </div>
-          <p className="text-gray-600 dark:text-slate-300">Ask me anything about your shop's performance, stock, or sales!</p>
+          <p className="text-gray-600 dark:text-slate-300">Ask me anything about your shop&apos;s performance, stock, or sales!</p>
         </div>
 
         {/* Quick Questions */}
