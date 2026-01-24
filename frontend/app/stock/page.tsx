@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
-import { itemsApi, Item } from '@/lib/api';
+import { itemsApi, Item } from '../../lib/api';
 import { Plus, Edit2, Trash2, AlertTriangle, Package } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '../../lib/utils';
 
 export default function StockPage() {
   const [items, setItems] = useState<Item[]>([]);

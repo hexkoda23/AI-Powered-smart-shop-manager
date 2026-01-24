@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import StatCard from '@/components/StatCard';
-import { DashboardStats } from '@/lib/api';
-import { dashboardApi } from '@/lib/api';
+import { DashboardStats } from '../lib/api';
+import { dashboardApi } from '../lib/api';
 import { DollarSign, TrendingUp, Package, AlertTriangle } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7'];

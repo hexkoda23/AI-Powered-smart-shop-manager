@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
-import { salesApi, itemsApi, Item, Sale } from '@/lib/api';
+import { salesApi, itemsApi, Item, Sale } from '../../lib/api';
 import { Plus, X } from 'lucide-react';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '../../lib/utils';
 
 export default function SalesPage() {
   const [items, setItems] = useState<Item[]>([]);

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
-import { aiApi } from '@/lib/api';
+import { aiApi } from '../../lib/api';
 import { Send, Bot, User, Sparkles, TrendingUp, Package } from 'lucide-react';
 
 interface Message {
