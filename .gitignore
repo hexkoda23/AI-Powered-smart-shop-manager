@@ -60,3 +60,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Allow frontend library files to be committed
+!frontend/lib/
+!frontend/lib/**
