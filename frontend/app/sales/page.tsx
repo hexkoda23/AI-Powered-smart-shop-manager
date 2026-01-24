@@ -13,7 +13,7 @@ export default function SalesPage() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     item_name: '',
-    quantity: 1,
+    quantity: 0,
     selling_price: 0,
   });
 
@@ -39,8 +39,12 @@ export default function SalesPage() {
     setLoading(true);
 
     try {
+      if (formData.quantity <= 0) {
+        alert('Quantity must be greater than 0');
+        return;
+      }
       await salesApi.create(formData);
-      setFormData({ item_name: '', quantity: 1, selling_price: 0 });
+      setFormData({ item_name: '', quantity: 0, selling_price: 0 });
       setShowForm(false);
       await loadData();
       alert('Sale recorded successfully!');
@@ -117,9 +121,9 @@ export default function SalesPage() {
                   </label>
                   <input
                     type="number"
-                    min="1"
+                  min="0"
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-slate-950 text-gray-900 dark:text-white"
                     required
                   />
