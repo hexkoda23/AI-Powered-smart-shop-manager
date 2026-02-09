@@ -1,12 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { itemsApi, Item } from '../../lib/api';
 import { Plus, Edit2, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
+import { getRole } from '../../lib/auth';
 
 export default function StockPage() {
+  const router = useRouter();
+  useEffect(() => {
+    const role = getRole();
+    if (role !== 'owner') {
+      router.replace('/sales');
+    }
+  }, [router]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);

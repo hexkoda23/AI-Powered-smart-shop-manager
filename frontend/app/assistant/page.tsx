@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { aiApi } from '../../lib/api';
 import { Send, Bot, User, Sparkles, TrendingUp, Package } from 'lucide-react';
+import { getRole } from '../../lib/auth';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,6 +15,13 @@ interface Message {
 }
 
 export default function AssistantPage() {
+  const router = useRouter();
+  useEffect(() => {
+    const role = getRole();
+    if (role !== 'owner') {
+      router.replace('/sales');
+    }
+  }, [router]);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
