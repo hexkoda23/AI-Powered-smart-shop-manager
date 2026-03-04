@@ -25,7 +25,7 @@ export default function RegisterPage() {
         }
 
         if (pin.length < 4) {
-            setError('PIN must be at least 4 digits');
+            setError('SECURITY_ERROR: PIN must be exactly 4-8 digits');
             return;
         }
 
@@ -80,23 +80,31 @@ export default function RegisterPage() {
                                 <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-3)]" />
                                 <input
                                     type="password"
-                                    placeholder="Create Security PIN"
+                                    placeholder="Set 4-Digit Security PIN"
                                     required
+                                    maxLength={8}
                                     value={pin}
-                                    onChange={(e) => setPin(e.target.value)}
-                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
+                                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-xl tracking-[0.5em] font-mono"
                                 />
+                            </div>
+                            <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 p-3 rounded-xl -mt-2">
+                                <p className="text-[var(--accent)] text-[10px] font-mono leading-tight">
+                                    <span className="font-bold uppercase tracking-wider">Note:</span> ENTER A 4-DIGIT PIN.
+                                    THIS WILL BE REQUIRED AT EVERY LOG IN.
+                                </p>
                             </div>
 
                             <div className="relative">
                                 <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-3)]" />
                                 <input
                                     type="password"
-                                    placeholder="Confirm Security PIN"
+                                    placeholder="Confirm 4-digit PIN"
                                     required
+                                    maxLength={8}
                                     value={confirmPin}
-                                    onChange={(e) => setConfirmPin(e.target.value)}
-                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)]"
+                                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-[var(--text-1)] placeholder:text-[var(--text-3)] tracking-widest"
                                 />
                             </div>
                         </div>
