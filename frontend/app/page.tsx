@@ -1,171 +1,153 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ShoppingBag, Zap, Shield, MessageSquare, BarChart3, ArrowRight, Star, CheckCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import StatCard from '@/components/StatCard';
-import { DashboardStats } from '../lib/api';
-import { dashboardApi } from '../lib/api';
-import { DollarSign, TrendingUp, Package, AlertTriangle } from 'lucide-react';
-import { formatCurrency } from '../lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { cn } from '../lib/utils';
 
-const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7'];
 
-export default function Home() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    try {
-      const data = await dashboardApi.getStats();
-      setStats(data);
-    } catch (error) {
-      console.error('Failed to load stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-red-600">Failed to load dashboard data</div>
-        </div>
-      </div>
-    );
-  }
-
-  const bestSellingData = stats.best_selling_items.map(item => ({
-    name: item.name,
-    quantity: item.quantity,
-  }));
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-[#07080a] text-white selection:bg-[var(--accent)] selection:text-black">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Dashboard</h1>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            title="Daily Profit"
-            value={stats.daily_profit}
-            icon={DollarSign}
-            isCurrency
-          />
-          <StatCard
-            title="Weekly Profit"
-            value={stats.weekly_profit}
-            icon={TrendingUp}
-            isCurrency
-          />
-          <StatCard
-            title="Monthly Profit"
-            value={stats.monthly_profit}
-            icon={DollarSign}
-            isCurrency
-          />
-          <StatCard
-            title="Low Stock Items"
-            value={stats.low_stock_items.length}
-            icon={AlertTriangle}
-          />
-        </div>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 overflow-hidden">
+        {/* Glow effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[120px] pointer-events-none" />
 
-        {/* Sales Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Today&apos;s Sales</h3>
-            <p className="text-3xl font-bold text-primary-600">{stats.total_sales_today} items</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-3)] border border-[var(--border)] mb-8 animate-in fade-in slide-in-from-bottom-4">
+            <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+              V2.0_POWERED_BY_AI_CORE
+            </span>
           </div>
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">This Week</h3>
-            <p className="text-3xl font-bold text-primary-600">{stats.total_sales_week} items</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">This Month</h3>
-            <p className="text-3xl font-bold text-primary-600">{stats.total_sales_month} items</p>
+
+          <h1 className="text-5xl md:text-7xl font-[800] leading-tight mb-6 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700" style={{ fontFamily: 'var(--font-display)' }}>
+            The Future of <br />
+            <span className="text-[var(--accent)]">Provision Store</span> Ops
+          </h1>
+
+          <p className="max-w-2xl mx-auto text-lg text-[var(--text-2)] mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+            Notable AI is a high-performance management ecosystem designed to eliminate inventory waste, maximize sales margin, and automate branch operations.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
+            <Link href="/register" className="btn btn-primary px-10 py-4 text-lg w-full sm:w-auto">
+              GET_STARTED
+              <ArrowRight size={20} />
+            </Link>
+            <Link href="/login" className="btn btn-outline px-10 py-4 text-lg w-full sm:w-auto">
+              OWNER_LOGIN
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Best Selling Items */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Best Selling Items</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={bestSellingData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="quantity" fill="#0ea5e9" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Low Stock Alerts */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Low Stock Alerts</h3>
-            {stats.low_stock_items.length === 0 ? (
-              <div className="text-center text-gray-500 dark:text-slate-400 py-12">
-                <Package className="w-12 h-12 mx-auto mb-4 text-gray-400 dark:text-slate-500" />
-                <p>All items are well stocked!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {stats.low_stock_items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>
-                      <p className="text-sm text-gray-600 dark:text-slate-300">
-                        Only {item.current_stock} left (threshold: {item.low_stock_threshold})
-                      </p>
-                    </div>
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Slow Moving Items */}
-        {stats.slow_moving_items.length > 0 && (
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 border border-transparent dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Slow Moving Items</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {stats.slow_moving_items.map((item) => (
-                <div key={item.name} className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900/40 rounded-lg">
-                  <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>
-                  <p className="text-sm text-gray-600 dark:text-slate-300 mt-1">{item.quantity} sold this month</p>
+      {/* Feature Grid */}
+      <section className="py-20 bg-[#0d0f12]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: Zap,
+                title: 'Predictive Restock',
+                desc: 'AI-driven burn rate analysis predicts stockouts before they happen.',
+                color: 'var(--accent)'
+              },
+              {
+                icon: MessageSquare,
+                title: '"Ghost" Assistant',
+                desc: 'Real-time upsell suggestions and margin alerts during checkout.',
+                color: 'var(--info)'
+              },
+              {
+                icon: Shield,
+                title: 'Debt Shield',
+                desc: 'Smart CRM with credit limit enforcement and payment tracking.',
+                color: 'var(--danger)'
+              },
+              {
+                icon: BarChart3,
+                title: 'Multi-Store',
+                desc: 'Seamlessly manage multiple branches with isolated data kernels.',
+                color: 'var(--gold)'
+              }
+            ].map((feature, i) => (
+              <div key={i} className="card p-8 group hover:border-[var(--accent)] transition-all">
+                <div className="w-12 h-12 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] flex items-center justify-center mb-6 group-hover:bg-[var(--accent-dim)] transition-colors">
+                  <feature.icon size={24} style={{ color: feature.color }} />
                 </div>
-              ))}
-            </div>
+                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                <p className="text-[var(--text-3)] text-sm leading-relaxed">
+                  {feature.desc}
+                </p>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      </section>
+
+      {/* Stats/Trust Bar */}
+      <section className="py-24 border-y border-[var(--border)] overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-sm font-mono text-[var(--text-3)] mb-16 uppercase tracking-[0.2em]">Deployment_Metrics</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+            {[
+              { label: 'AVG_SALES_UPSET', val: '+24%' },
+              { label: 'WASTE_REDUCTION', val: '40%' },
+              { label: 'BRANCHES_SUPPORTED', val: '∞' },
+              { label: 'UPTIME_GUARANTEE', val: '99.9%' }
+            ].map((stat, i) => (
+              <div key={i}>
+                <p className="text-4xl md:text-5xl font-black text-white mb-2" style={{ fontFamily: 'var(--font-display)' }}>
+                  {stat.val}
+                </p>
+                <p className="text-xs font-mono text-[var(--accent)]">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-32 relative">
+        <div className="absolute inset-0 bg-[var(--accent)] opacity-[0.02] -skew-y-3" />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-8" style={{ fontFamily: 'var(--font-display)' }}>
+            Ready to upgrade your store?
+          </h2>
+          <p className="text-[var(--text-2)] mb-12 text-lg">
+            Join 500+ provision store owners using Notable to automate their daily grind.
+          </p>
+          <Link
+            href="/register"
+            className="btn btn-primary px-12 py-5 text-xl font-bold rounded-full group mx-auto"
+          >
+            INITIALIZE_NOW
+            <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-[var(--border)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--accent)]" style={{ boxShadow: 'var(--glow-accent)' }} />
+            <span className="font-black tracking-tighter text-xl">NOTABLE</span>
+          </div>
+          <div className="flex gap-8 text-xs font-mono text-[var(--text-3)]">
+            <a href="#" className="hover:text-white">API_DOCS</a>
+            <a href="#" className="hover:text-white">SECURITY_MANIFESTO</a>
+            <a href="#" className="hover:text-white">TERMS_v2.0</a>
+          </div>
+          <p className="text-[var(--text-3)] text-xs font-mono">
+            &copy; 2026 NOTABLE_LABS. ALL_RIGHTS_RESERVED.
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

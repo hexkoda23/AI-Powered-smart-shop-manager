@@ -3,58 +3,130 @@
 @tailwind utilities;
 
 :root {
-  /* Light theme defaults */
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
-  --font-family: var(--font-light);
+  /* Core Colors */
+  --bg: #07080a;
+  --bg-2: #0d0f12;
+  --bg-3: #13161a;
+  --accent: #00e5a0;
+  --accent-dim: rgba(0, 229, 160, 0.1);
+  --warn: #ff6b35;
+  --danger: #ff3b5c;
+  --info: #4d9fff;
+  --gold: #d4af37;
+  --white: #ffffff;
+  --text: #ffffff;
+  --text-2: #8b9097;
+  --text-3: #4e535b;
+  --border: #1a1d23;
+  --border-2: #2a2e37;
+  
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Bricolage Grotesque', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  
+  /* Effects */
+  --radius: 8px;
+  --shadow-accent: 0 0 20px rgba(0, 229, 160, 0.15);
+  --glow-accent: 0 0 10px var(--accent);
 }
 
-html.dark {
-  /* Dark theme overrides */
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 2, 6, 23; /* slate-950-ish */
-  --font-family: var(--font-dark);
-}
+@layer base {
+  body {
+    @apply bg-[var(--bg)] text-[var(--text)] antialiased;
+    font-family: var(--font-body);
+    background-image: 
+      linear-gradient(rgba(0, 229, 160, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 160, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+  }
 
-body {
-  font-family: var(--font-family);
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-[var(--radius)] font-medium transition-all duration-200 flex items-center justify-center gap-2;
+    font-family: var(--font-display);
+  }
+  
+  .btn-primary {
+    @apply bg-[var(--accent)] text-[var(--bg)] hover:brightness-110 active:scale-95;
+    box-shadow: var(--shadow-accent);
+  }
+  
+  .btn-outline {
+    @apply border border-[var(--border)] hover:bg-[var(--bg-2)] active:scale-95;
+  }
+
+  .card {
+    @apply bg-[var(--bg-2)] border border-[var(--border)] rounded-[var(--radius)] p-6 transition-all duration-300;
+  }
+  
+  .card:hover {
+    @apply border-[var(--border-2)] transform -translate-y-1;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+  }
+
+  .input {
+    @apply bg-[var(--bg-3)] border border-[var(--border)] rounded-[var(--radius)] px-4 py-2 outline-none transition-all duration-200 focus:border-[var(--accent)];
+    font-family: var(--font-mono);
+  }
+
+  .badge {
+    @apply px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider;
+    font-family: var(--font-mono);
+  }
+
+  .badge-accent { @apply bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]; }
+  .badge-warn { @apply bg-[rgba(255,107,53,0.1)] text-[var(--warn)] border border-[var(--warn)]; }
+  .badge-danger { @apply bg-[rgba(255,59,92,0.1)] text-[var(--danger)] border border-[var(--danger)]; }
+  .badge-info { @apply bg-[rgba(77,159,255,0.1)] text-[var(--info)] border border-[var(--info)]; }
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+/* Animations */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+.shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(to right, var(--bg-2) 4%, var(--bg-3) 25%, var(--bg-2) 36%);
+  background-size: 1000px 100%;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+.page-enter {
+  animation: pageFadeIn 0.5s ease-out;
 }
 
-html.dark ::-webkit-scrollbar-track {
-  background: #0b1220;
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-html.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+/* Data Table Styles */
+.data-table {
+  @apply w-full border-collapse;
 }
 
-html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+.data-table th {
+  @apply text-left py-4 px-4 text-[var(--text-3)] font-mono text-xs uppercase tracking-widest border-b border-[var(--border)];
+}
+
+.data-table td {
+  @apply py-4 px-4 border-b border-[var(--border)];
+}
+
+.data-table tr:hover td {
+  @apply bg-[var(--bg-3)];
+}
+
+/* Monospace Helpers */
+.mono {
+  font-family: var(--font-mono);
 }

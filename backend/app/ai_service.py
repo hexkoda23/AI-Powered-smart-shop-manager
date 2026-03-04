@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from openai import OpenAI
+from groq import Groq
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models import Sale, Item
@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key) if api_key else None
+groq_api_key = os.getenv("GROQ_API_KEY")
+client = Groq(api_key=groq_api_key) if groq_api_key else None
 
 
 class AIService:
@@ -124,54 +124,29 @@ class AIService:
         
         # Prepare context for AI
         context = f"""
-        Shop Management System Data:
-        
-        Sales Trends (Last 30 days):
-        - Fast-moving items: {list(trends['fast_moving'].keys())[:5]}
-        - High profit items: {list(trends['high_profit'].keys())[:5]}
-        - Total profit: ${trends['total_profit_30d']:.2f}
-        - Total items sold: {trends['total_sales_30d']}
-        
-        Current Stock Status:
-        - Low stock items: {list(stock_df[stock_df['is_low_stock']]['item_name'])}
-        
-        Restock Recommendations:
-        {chr(10).join(recommendations[:5])}
-        """
-        
-        if not sales_df.empty:
-            context += f"""
-        
-        Recent Sales Data (sample):
-        {sales_df.head(10).to_string()}
+        Shop Name: {self.db.query(Shop).filter(Shop.id == shop_id).first().name}
+        Fast moving items: {trends['fast_moving']}
+        High profit items: {trends['high_profit']}
+        Current stock situation: {len(recommendations)} items need attention.
+        Top 3 restock recommendations: {', '.join(recommendations[:3])}
         """
         
         if not client:
-            # Fallback response when OpenAI API key is not configured
-            insights = []
-            if trends['fast_moving']:
-                top_item = list(trends['fast_moving'].keys())[0]
-                insights.append(f"{top_item} is your best-selling item")
-            
-            if trends['high_profit']:
-                top_profit = list(trends['high_profit'].keys())[0]
-                insights.append(f"{top_profit} generates the most profit")
-            
             return {
-                'response': f"Based on your shop data: {user_message}. Please configure your OpenAI API key for more detailed AI-powered insights.",
-                'insights': insights,
+                'response': f"Based on your shop data: {user_message}. Please ensure your GROQ_API_KEY is configured in the .env file for AI-powered insights.",
+                'insights': [], # Simplified fallback
                 'recommendations': recommendations[:3]
             }
-        
+
         try:
             response = client.chat.completions.create(
-                model="gpt-4",
+                model="llama3-70b-8192",
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a helpful shop assistant AI. You help shop owners understand their business through simple, clear language. 
+                        "content": """You are a helpful shop assistant AI for 'Notable'. You help shop owners understand their business through simple, clear language. 
                         You analyze sales data, stock levels, and provide actionable insights. Always be friendly, concise, and practical.
-                        Focus on what matters: what to restock, what's selling well, and profit insights."""
+                        Focus on what matters: what to restock, what's selling well, and profit insights. Use Naira (₦) for currency."""
                     },
                     {
                         "role": "user",
@@ -179,20 +154,15 @@ class AIService:
                     }
                 ],
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=1024
             )
             
             ai_response = response.choices[0].message.content
             
-            # Extract insights and recommendations
+            # Extract simple insights
             insights = []
             if trends['fast_moving']:
-                top_item = list(trends['fast_moving'].keys())[0]
-                insights.append(f"{top_item} is your best-selling item")
-            
-            if trends['high_profit']:
-                top_profit = list(trends['high_profit'].keys())[0]
-                insights.append(f"{top_profit} generates the most profit")
+                insights.append(f"{list(trends['fast_moving'].keys())[0]} is your most popular item")
             
             return {
                 'response': ai_response,
@@ -201,7 +171,7 @@ class AIService:
             }
         except Exception as e:
             return {
-                'response': f"I encountered an error: {str(e)}. Please check your OpenAI API key configuration.",
+                'response': f"I encountered an error while connecting to Groq: {str(e)}. Please check your GROQ_API_KEY configuration.",
                 'insights': [],
                 'recommendations': recommendations[:3]
             }

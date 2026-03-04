@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { aiApi } from '../../lib/api';
-import { Send, Bot, User, Sparkles, TrendingUp, Package } from 'lucide-react';
-import { getRole } from '../../lib/auth';
+import { Send, Bot, User, Sparkles, TrendingUp, Package, Zap, MessageSquare } from 'lucide-react';
+import { isOwnerSessionValid } from '../../lib/auth';
+import { cn } from '../../lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -16,21 +17,21 @@ interface Message {
 
 export default function AssistantPage() {
   const router = useRouter();
-  useEffect(() => {
-    const role = getRole();
-    if (role !== 'owner') {
-      router.replace('/sales');
-    }
-  }, [router]);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hello! I'm your AI shop assistant. I can help you with:\n\n• Sales insights and trends\n• Stock recommendations\n• Profit analysis\n• Business questions\n\nWhat would you like to know?",
+      content: "SYSTEM_INITIALIZED: Notable AI v1.0\n\nI am your strategic shop assistant. I have mapped your current inventory and sales trajectory. How can I optimize your operations today?",
     },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOwnerSessionValid()) {
+      router.replace('/login');
+    }
+  }, [router]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -40,11 +41,12 @@ export default function AssistantPage() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSend = async (e?: React.FormEvent, text?: string) => {
+    if (e) e.preventDefault();
+    const messageContent = text || input;
+    if (!messageContent.trim() || loading) return;
 
-    const userMessage = input.trim();
+    const userMessage = messageContent.trim();
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
@@ -61,12 +63,11 @@ export default function AssistantPage() {
         },
       ]);
     } catch (error: any) {
-      console.error('Failed to get AI response:', error);
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Sorry, I encountered an error. Please make sure your OpenAI API key is configured correctly.',
+          content: 'ERR_LLM_TIMEOUT: Please verify your connection or API configuration.',
         },
       ]);
     } finally {
@@ -75,150 +76,190 @@ export default function AssistantPage() {
   };
 
   const quickQuestions = [
-    "What should I restock this week?",
-    "Which items sell the most?",
-    "How much profit did I make last month?",
-    "What are my slow-moving items?",
-    "Show me sales trends",
+    "Predict restock needs",
+    "Identify top 5 revenue drivers",
+    "Analyze monthly profit trajectory",
+    "Detect slow-moving inventory",
   ];
 
-  const handleQuickQuestion = (question: string) => {
-    setInput(question);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col">
+    <div className="min-h-screen page-enter flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
       <Navbar />
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
-        <div className="mb-6">
-          <div className="flex items-center mb-2">
-            <Sparkles className="w-6 h-6 text-primary-600 mr-2" />
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Shop Assistant</h1>
-          </div>
-          <p className="text-gray-600 dark:text-slate-300">Ask me anything about your shop&apos;s performance, stock, or sales!</p>
-        </div>
 
-        {/* Quick Questions */}
-        <div className="mb-6">
-          <p className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Quick Questions:</p>
-          <div className="flex flex-wrap gap-2">
-            {quickQuestions.map((question, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleQuickQuestion(question)}
-                className="px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-950 hover:border-primary-300 transition-colors"
-              >
-                {question}
-              </button>
-            ))}
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex flex-col gap-8 h-[calc(100vh-80px)]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--accent-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
+              <Bot size={24} color="var(--accent)" />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '2rem', lineHeight: 1 }}>Neural Advisor</h1>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '0.25rem' }}>MODE: STRATEGIC_ANALYSIS</p>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center gap-2">
+            <div
+              style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)', animation: 'pulse 2s infinite' }}
+            />
+            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-2)' }}>SYSTEM_READY</span>
           </div>
         </div>
 
-        {/* Chat Messages */}
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-lg shadow-md p-6 mb-6 overflow-y-auto border border-transparent dark:border-slate-800">
-          <div className="space-y-4">
-            {messages.map((message, idx) => (
-              <div
-                key={idx}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`flex items-start space-x-3 max-w-[80%] ${
-                    message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-                  }`}
+        <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
+
+          {/* Chat Pane */}
+          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+            {/* Quick Prompts */}
+            <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-none">
+              {quickQuestions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSend(undefined, q)}
+                  className="btn btn-outline whitespace-nowrap text-xs py-2 px-3 border-dashed"
                 >
-                  <div
-                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      message.role === 'user'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-primary-100 text-primary-600'
-                    }`}
-                  >
-                    {message.role === 'user' ? (
-                      <User className="w-5 h-5" />
-                    ) : (
-                      <Bot className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div
-                    className={`rounded-lg p-4 ${
-                      message.role === 'user'
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    
-                    {message.insights && message.insights.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-300 dark:border-slate-700">
-                        <div className="flex items-center mb-2">
-                          <TrendingUp className="w-4 h-4 mr-2" />
-                          <span className="text-sm font-semibold">Insights:</span>
-                        </div>
-                        <ul className="list-disc list-inside text-sm space-y-1">
-                          {message.insights.map((insight, i) => (
-                            <li key={i}>{insight}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                  <Zap size={12} color="var(--accent)" />
+                  {q}
+                </button>
+              ))}
+            </div>
 
-                    {message.recommendations && message.recommendations.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-300 dark:border-slate-700">
-                        <div className="flex items-center mb-2">
-                          <Package className="w-4 h-4 mr-2" />
-                          <span className="text-sm font-semibold">Recommendations:</span>
-                        </div>
-                        <ul className="list-disc list-inside text-sm space-y-1">
-                          {message.recommendations.map((rec, i) => (
-                            <li key={i}>{rec}</li>
-                          ))}
-                        </ul>
+            {/* Messages Container */}
+            <div
+              className="flex-1 overflow-y-auto pr-4 space-y-6 scrollbar-thin scrollbar-thumb-[var(--border)]"
+            >
+              {messages.map((msg, i) => (
+                <div key={i} className={cn("flex flex-col gap-2", msg.role === 'user' ? "items-end" : "items-start")}>
+                  <div className="flex items-center gap-2 mb-1 px-1">
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>
+                      {msg.role === 'user' ? 'USER_PROMPT' : 'ASSISTANT_RELAY'}
+                    </span>
+                  </div>
+                  <div
+                    className="card"
+                    style={{
+                      backgroundColor: msg.role === 'user' ? 'var(--bg-3)' : 'var(--bg-2)',
+                      border: msg.role === 'user' ? '1px solid var(--accent-dim)' : '1px solid var(--border)',
+                      padding: '1rem 1.25rem',
+                      maxWidth: '85%',
+                      borderRadius: msg.role === 'user' ? '18px 4px 18px 18px' : '4px 18px 18px 18px'
+                    }}
+                  >
+                    <p style={{ fontSize: '0.95rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+
+                    {/* Assistant Extra Sections */}
+                    {(msg.insights || msg.recommendations) && (
+                      <div className="mt-6 pt-4 border-t border-[var(--border)] grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {msg.insights && msg.insights.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-[var(--info)]">
+                              <TrendingUp size={14} />
+                              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>KEY_INSIGHTS</span>
+                            </div>
+                            <ul className="space-y-1">
+                              {msg.insights.map((insight, idx) => (
+                                <li key={idx} className="text-[0.8rem] text-[var(--text-2)] flex items-start gap-2">
+                                  <span className="mt-1.5 w-1 h-1 rounded-full bg-[var(--text-3)] flex-shrink-0" />
+                                  {insight}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {msg.recommendations && msg.recommendations.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-[var(--accent)]">
+                              <Zap size={14} />
+                              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>ACTIONS_REQ</span>
+                            </div>
+                            <ul className="space-y-1">
+                              {msg.recommendations.map((rec, idx) => (
+                                <li key={idx} className="text-[0.8rem] text-[var(--text-2)] flex items-start gap-2">
+                                  <span className="mt-1.5 w-1 h-1 rounded-full bg-[var(--text-3)] flex-shrink-0" />
+                                  {rec}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center">
-                    <Bot className="w-5 h-5" />
-                  </div>
-                  <div className="bg-gray-100 dark:bg-slate-950 rounded-lg p-4">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
+              ))}
+
+              {loading && (
+                <div className="flex flex-col items-start gap-2">
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>PROCESSING_REQUEST</span>
+                  <div className="card h-12 flex items-center gap-2 px-4 border-dashed animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0s' }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.4s' }} />
                   </div>
                 </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Form */}
+            <form
+              onSubmit={handleSend}
+              className="mt-auto relative"
+            >
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Query global inventory, sales patterns, or projections..."
+                className="input w-full h-16 pl-14 pr-20 text-lg border-2"
+                style={{ borderColor: input.length > 0 ? 'var(--accent)' : 'var(--border)' }}
+                disabled={loading}
+              />
+              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[var(--text-3)]">
+                <MessageSquare size={20} />
               </div>
-            )}
-            <div ref={messagesEndRef} />
+              <button
+                type="submit"
+                disabled={loading || !input.trim()}
+                className="absolute right-3 top-1/2 -translate-y-1/2 btn btn-primary h-10 w-12 p-0"
+              >
+                <Send size={18} />
+              </button>
+            </form>
+          </div>
+
+          {/* Sidebar Insights (Static suggestions) */}
+          <div className="hidden lg:flex w-72 flex-col gap-6">
+            <div className="card border-dashed">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={16} color="var(--accent)" />
+                <h3 style={{ fontSize: '0.9rem' }}>Suggested Strategy</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
+                    "Sales for **Indomie** peak between 4 PM - 7 PM. Consider running a bundle deal on eggs."
+                  </p>
+                </div>
+                <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
+                    "Your cash liquidity is high. Optimal time for a total stock refresh."
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="card group hover:border-[var(--info)] transition-colors">
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', marginBottom: '0.5rem' }}>SYSTEM_STATUS</p>
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Sync Health</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>99.9%</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Input Form */}
-        <form onSubmit={handleSend} className="flex space-x-4">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything about your shop..."
-            className="flex-1 px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-slate-950 text-gray-900 dark:text-white"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </form>
-      </div>
+      </main>
     </div>
   );
 }

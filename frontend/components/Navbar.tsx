@@ -3,45 +3,95 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ShoppingBag, BarChart3, Moon, Sun, Shield, Package, MessageSquare } from 'lucide-react';
+import { ShoppingBag, BarChart3, Package, MessageSquare, Shield, User, ChevronDown, Store, Lock as LockIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useTheme } from './ThemeProvider';
-import { getRole, setRole } from '../lib/auth';
+import { getRole, setOwnerSession, getShopContext, setRole, clearAuth } from '../lib/auth';
 
 const workerNav = [
-  { href: '/', label: 'Dashboard', icon: BarChart3 },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { href: '/sales', label: 'Record Sale', icon: ShoppingBag },
 ];
 
 const ownerNav = [
-  { href: '/', label: 'Dashboard', icon: BarChart3 },
+  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { href: '/sales', label: 'Record Sale', icon: ShoppingBag },
   { href: '/stock', label: 'Stock', icon: Package },
+  { href: '/customers', label: 'Customers', icon: User },
   { href: '/assistant', label: 'AI Assistant', icon: MessageSquare },
+  { href: '/settings', label: 'Settings', icon: Shield },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
   const [roleState, setRoleState] = useState<'owner' | 'worker' | null>(null);
+  const [shopName, setShopName] = useState<string | null>(null);
+
   const navItems = roleState === 'owner' ? ownerNav : workerNav;
-  const showNav = !(pathname === '/admin' && roleState !== 'owner');
+  const isLanding = pathname === '/';
 
   useEffect(() => {
-    setRoleState(getRole());
+    const role = getRole();
+    setRoleState(role);
+    const context = getShopContext();
+    setShopName(context.name);
+
+    // Auto-clear owner session if leaving owner pages
+    const ownerPages = ['/stock', '/customers', '/assistant', '/settings', '/admin'];
+    if (role === 'owner' && !ownerPages.some(p => pathname.startsWith(p)) && pathname !== '/login' && pathname !== '/dashboard') {
+      setOwnerSession(false);
+      setRoleState('worker');
+    }
   }, [pathname]);
 
+  const handleLogout = () => {
+    clearAuth();
+    router.push('/');
+    router.refresh();
+  };
+
   return (
-    <nav className="bg-white dark:bg-slate-950 shadow-lg sticky top-0 z-50 border-b border-transparent dark:border-slate-800">
+    <nav
+      style={{
+        backgroundColor: 'var(--bg)',
+        borderBottom: '1px solid var(--border)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        backdropFilter: 'blur(10px)'
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-primary-600">Notable AI Shop Assistant</h1>
+        <div className="flex justify-between h-20 items-center">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-2">
+                <div
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    backgroundColor: 'var(--accent)',
+                    borderRadius: '50%',
+                    boxShadow: 'var(--glow-accent)'
+                  }}
+                />
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  NOTABLE
+                </span>
+              </Link>
+
+              {shopName && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-2)]">
+                  <Store size={14} color="var(--accent)" />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', fontWeight: 700 }}>
+                    {shopName.toUpperCase()}
+                  </span>
+                </div>
+              )}
             </div>
-            {showNav && (
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+
+            {roleState && !isLanding && (
+              <div className="hidden lg:flex items-center gap-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -49,14 +99,22 @@ export default function Navbar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={cn(
-                        'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'border-primary-500 text-primary-600'
-                          : 'border-transparent text-gray-600 dark:text-slate-300 hover:border-gray-300 dark:hover:border-slate-600 hover:text-gray-900 dark:hover:text-white'
-                      )}
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: 'var(--radius)',
+                        backgroundColor: isActive ? 'var(--bg-3)' : 'transparent',
+                        color: isActive ? 'var(--accent)' : 'var(--text-2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s'
+                      }}
+                      className="hover:text-[var(--white)]"
                     >
-                      <Icon className="w-4 h-4 mr-2" />
+                      <Icon size={14} />
                       {item.label}
                     </Link>
                   );
@@ -65,66 +123,51 @@ export default function Navbar() {
             )}
           </div>
 
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors"
-              aria-label="Toggle theme"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
-            <div className="ml-3 inline-flex gap-2">
-              <Link
-                href="/admin"
-                className="inline-flex items-center rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors"
-              >
-                Owner
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setRole('worker')
-                  setRoleState('worker')
-                  router.push('/sales')
-                }}
-                className="inline-flex items-center rounded-lg border border-gray-200 dark:border-slate-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors"
-              >
-                Worker
-              </button>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2">
+              <span className={cn("badge", roleState === 'owner' ? "badge-accent" : roleState === 'worker' ? "badge-info" : "hidden")}>
+                {roleState}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {roleState === 'owner' ? (
+                <button
+                  onClick={() => {
+                    setOwnerSession(false);
+                    setRoleState('worker');
+                    router.push('/dashboard');
+                  }}
+                  className="btn btn-outline"
+                >
+                  <User size={18} />
+                  <span className="hidden sm:inline">Switch to Worker</span>
+                </button>
+              ) : roleState === 'worker' ? (
+                <Link href="/login" className="btn btn-primary">
+                  <LockIcon size={18} />
+                  <span className="hidden sm:inline">Owner Login</span>
+                </Link>
+              ) : (
+                <Link href="/register" className="btn btn-primary">
+                  <ShoppingBag size={18} />
+                  <span className="hidden sm:inline">Get Started</span>
+                </Link>
+              )}
+
+              {roleState && (
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-[var(--text-3)] hover:text-[var(--danger)] transition-colors"
+                  title="Logout"
+                >
+                  <LockIcon size={18} />
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
-     
-      {/* Mobile menu */}
-      {showNav && (
-        <div className="sm:hidden border-t border-gray-200 dark:border-slate-800">
-          <div className="pt-2 pb-3 space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center px-3 py-2 text-base font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary-50 dark:bg-slate-900 border-primary-500 text-primary-700 dark:text-primary-300 border-l-4'
-                      : 'text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-900 hover:text-gray-900 dark:hover:text-white'
-                  )}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }
