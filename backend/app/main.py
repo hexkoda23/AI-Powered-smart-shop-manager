@@ -43,22 +43,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-import traceback
-from sqlalchemy import text
 
-@app.get("/api/debug-db")
-def debug_db(db: Session = Depends(get_db)):
-    try:
-        # Check SQLite db schema
-        result = db.execute(text("PRAGMA table_info(items);")).fetchall()
-        schema = [dict(row._mapping) for row in result]
-        
-        # Test item creation manually
-        db.execute(text("INSERT INTO items (name, current_stock, low_stock_threshold, selling_price, cost_price, shop_id) VALUES ('test_debug_123', 10, 5, 100, 50, 1)"))
-        db.commit()
-        return {"schema": schema, "message": "Insert successful"}
-    except Exception as e:
-        return {"error": str(e), "traceback": traceback.format_exc()}
 
 @app.get("/")
 def root():
