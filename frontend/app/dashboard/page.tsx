@@ -159,11 +159,17 @@ export default function DashboardPage() {
                         isCurrency
                         trend={{ value: 2.1, isPositive: false }}
                     />
-                    <StatCard
-                        title="Inventory Risk"
-                        value={stats.low_stock_items.length}
-                        icon={AlertTriangle}
-                    />
+                    <div
+                        onClick={() => router.push('/stock')}
+                        className="cursor-pointer transition-transform hover:scale-[1.02]"
+                        title="View Low Stock Items in Inventory"
+                    >
+                        <StatCard
+                            title="Inventory Risk"
+                            value={stats.low_stock_items.length}
+                            icon={AlertTriangle}
+                        />
+                    </div>
                 </div>
 
                 {/* Volume Cards */}

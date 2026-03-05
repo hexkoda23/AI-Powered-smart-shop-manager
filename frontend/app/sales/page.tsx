@@ -420,7 +420,7 @@ export default function SalesPage() {
                         </td>
                         <td className="text-right">
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                            {formatDateTime(sale.sale_date).split(', ')[1]}
+                            {formatDateTime(sale.sale_date).replace(/, \d{4}/, '')}
                           </span>
                         </td>
                       </tr>
