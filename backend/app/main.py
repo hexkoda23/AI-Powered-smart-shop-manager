@@ -35,7 +35,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
-        "https://ai-powered-smart-shop-manager-o9mmsw4g4.vercel.app" # Production frontend
+        "https://ai-powered-smart-shop-manager-o9mmsw4g4.vercel.app", # Specific build URL
+        "https://ai-powered-smart-shop-manager.vercel.app"             # Main production URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
