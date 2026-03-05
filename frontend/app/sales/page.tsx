@@ -21,6 +21,9 @@ export default function SalesPage() {
   const [customerRisk, setCustomerRisk] = useState<{ risk: 'LOW' | 'MEDIUM' | 'HIGH', current: number, limit: number } | null>(null);
   const [role, setRole] = useState<Role>(null);
 
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+
   const [formData, setFormData] = useState({
     item_name: '',
     quantity: 0,
@@ -49,10 +52,19 @@ export default function SalesPage() {
     }
   };
 
-  const handleCustomerSelect = async (customerId: number) => {
-    setSelectedCustomerId(customerId);
-    const risk = await aiApi.getCustomerRisk(customerId);
-    setCustomerRisk(risk);
+  const handleCustomerSelect = async (name: string) => {
+    setCustomerName(name);
+    const existingCustomer = customers.find(c => c.name === name);
+
+    if (existingCustomer) {
+      setSelectedCustomerId(existingCustomer.id);
+      setCustomerPhone(existingCustomer.phone || '');
+      const risk = await aiApi.getCustomerRisk(existingCustomer.id);
+      setCustomerRisk(risk);
+    } else {
+      setSelectedCustomerId(null);
+      setCustomerRisk(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,21 +82,40 @@ export default function SalesPage() {
 
       const total = formData.quantity * formData.selling_price;
 
-      if (payLater && !selectedCustomerId) {
-        setError('SELECT_CUSTOMER_FOR_CREDIT');
+      if (payLater && !customerName.trim()) {
+        setError('CUSTOMER_NAME_REQUIRED_FOR_CREDIT');
         setLoading(false);
         return;
       }
 
       await salesApi.create(formData);
 
-      if (payLater && selectedCustomerId) {
-        await debtApi.logDebt(selectedCustomerId, total, `Credit sale: ${formData.item_name} x ${formData.quantity}`);
+      if (payLater) {
+        let finalCustomerId = selectedCustomerId;
+
+        // Auto-create customer if they don't exist
+        if (!finalCustomerId) {
+          try {
+            const newCustomer = await customersApi.create({
+              name: customerName,
+              phone: customerPhone || '0000000000'
+            });
+            finalCustomerId = newCustomer.id;
+          } catch (err) {
+            setError('FAILED_TO_CREATE_CUSTOMER');
+            setLoading(false);
+            return;
+          }
+        }
+
+        await debtApi.logDebt(finalCustomerId, total, `Credit sale: ${formData.item_name} x ${formData.quantity}`);
       }
 
       setFormData({ item_name: '', quantity: 0, selling_price: 0 });
       setPayLater(false);
       setSelectedCustomerId(null);
+      setCustomerName('');
+      setCustomerPhone('');
       setCustomerRisk(null);
       await loadData();
       setSuccess(true);
@@ -119,7 +150,7 @@ export default function SalesPage() {
     setFormData({
       ...formData,
       item_name: itemName,
-      selling_price: item?.unit_price || 0,
+      selling_price: item?.selling_price || 0,
     });
     updateSuggestions(itemName);
   };
@@ -208,7 +239,7 @@ export default function SalesPage() {
                       <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border)' }} />
                       <div className="flex flex-col">
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>UNIT_PRICE</span>
-                        <span style={{ fontWeight: 700 }}>{formatCurrency(selectedItem.unit_price)}</span>
+                        <span style={{ fontWeight: 700 }}>{formatCurrency(selectedItem.selling_price)}</span>
                       </div>
                     </div>
                   )}
@@ -257,18 +288,32 @@ export default function SalesPage() {
                   {payLater && (
                     <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
                       <div className="space-y-2">
-                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>SELECT_CUSTOMER</label>
-                        <select
+                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>CUSTOMER_NAME</label>
+                        <input
+                          list="customer-list"
+                          type="text"
                           className="input w-full"
-                          value={selectedCustomerId || ''}
-                          onChange={(e) => handleCustomerSelect(parseInt(e.target.value))}
+                          value={customerName}
+                          onChange={(e) => handleCustomerSelect(e.target.value)}
+                          placeholder="Search or enter new name..."
                           required
-                        >
-                          <option value="">Choose Customer...</option>
+                        />
+                        <datalist id="customer-list">
                           {customers.map(c => (
-                            <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                            <option key={c.id} value={c.name} />
                           ))}
-                        </select>
+                        </datalist>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>PHONE_NUMBER (OPTIONAL)</label>
+                        <input
+                          type="text"
+                          className="input w-full"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          placeholder="e.g. 08012345678"
+                        />
                       </div>
 
                       {customerRisk && (
