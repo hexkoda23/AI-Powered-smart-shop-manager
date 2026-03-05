@@ -1,12 +1,56 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Zap, Shield, MessageSquare, BarChart3, ArrowRight, Star, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Zap, Shield, MessageSquare, BarChart3, ArrowRight, Star, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { cn } from '../lib/utils';
 
+const ECOSYSTEM_STEPS = [
+  {
+    step: '01',
+    title: 'Deploy Store Identity',
+    desc: 'Initialize your digital presence by registering your business name and establishing a secure, 10-character alphanumeric password. This first layer of security protects your core business data from the start.',
+    icon: Store
+  },
+  {
+    step: '02',
+    title: 'Initialize Worker Ops',
+    desc: 'Empower your team with high-performance dashboards. Record every sale in real-time, track inventory fluctuations automatically, and build a lasting customer database without complex administrative overhead.',
+    icon: ShoppingBag
+  },
+  {
+    step: '03',
+    title: 'Elevate to Owner Core',
+    desc: 'Unlock strategic command by elevating your role. Using a secure 4-digit PIN, access advanced profit analytics, AI-driven stock auditing, and sensitive system settings tailored for business growth.',
+    icon: ShieldCheck
+  }
+];
+
+import { Store, ShieldCheck } from 'lucide-react';
 
 export default function LandingPage() {
+  const [activeStep, setActiveStep] = useState(0);
+  const [hasShop, setHasShop] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const shopId = window.localStorage.getItem('notable_shop_id');
+      setHasShop(!!shopId);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveStep((prev) => (prev + 1) % ECOSYSTEM_STEPS.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const scrollToEcosystem = () => {
+    document.getElementById('ecosystem')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-[#07080a] text-white selection:bg-[var(--accent)] selection:text-black">
       <Navbar />
@@ -17,12 +61,6 @@ export default function LandingPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[120px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-3)] border border-[var(--border)] mb-8 animate-in fade-in slide-in-from-bottom-4">
-            <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em' }}>
-              V2.0_POWERED_BY_AI_CORE
-            </span>
-          </div>
 
           <h1 className="text-5xl md:text-7xl font-[800] leading-tight mb-6 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700" style={{ fontFamily: 'var(--font-display)' }}>
             The Future of <br />
@@ -34,13 +72,84 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <Link href="/register" className="btn btn-primary px-10 py-4 text-lg w-full sm:w-auto">
+            <Link href={hasShop ? "/login" : "/register"} className="btn btn-primary px-10 py-4 text-lg w-full sm:w-auto">
               GET_STARTED
               <ArrowRight size={20} />
             </Link>
-            <Link href="/login" className="btn btn-outline px-10 py-4 text-lg w-full sm:w-auto">
-              OWNER_LOGIN
-            </Link>
+            <button
+              onClick={scrollToEcosystem}
+              className="btn btn-outline px-10 py-4 text-lg w-full sm:w-auto group"
+            >
+              VIEW_DEMO
+              <Zap size={18} className="ml-2 group-hover:text-[var(--accent)] transition-colors" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Rotating Steps Explanation Section */}
+      <section id="ecosystem" className="py-24 relative overflow-hidden bg-[var(--bg-2)]/30">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold mb-4 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+              Mastering the <span className="text-[var(--accent)]">Notable Ecosystem</span>
+            </h2>
+            <p className="text-[var(--text-3)] max-w-xl mx-auto">Discover the three-tiered architecture designed to scale your provision business from deployment to strategic dominance.</p>
+          </div>
+
+          <div className="relative group">
+            {/* Carousel Container */}
+            <div className="glass p-1 rounded-[3rem] border border-[var(--border)] relative overflow-hidden bg-[var(--bg-3)]/20">
+              <div className="flex transition-transform duration-700 ease-in-out" style={{ transform: `translateX(-${activeStep * 100}%)` }}>
+                {ECOSYSTEM_STEPS.map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={i} className="min-w-full p-12 md:p-20 flex flex-col items-center text-center">
+                      <div className="w-20 h-20 rounded-3xl bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center mb-8 shadow-2xl shadow-[var(--accent)]/5">
+                        <Icon size={40} className="text-[var(--accent)]" />
+                      </div>
+                      <div className="inline-block px-4 py-1 rounded-full bg-[var(--bg-3)] border border-[var(--border)] mb-6">
+                        <span className="font-mono text-[10px] text-[var(--text-3)] font-bold uppercase tracking-[0.3em]">Module_{item.step}</span>
+                      </div>
+                      <h3 className="text-3xl font-bold mb-6 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>{item.title}</h3>
+                      <p className="text-[var(--text-2)] text-lg leading-relaxed max-w-2xl mx-auto">
+                        {item.desc}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Carousel Controls */}
+            <div className="flex justify-center items-center gap-6 mt-12">
+              <button
+                onClick={() => setActiveStep((prev) => (prev - 1 + ECOSYSTEM_STEPS.length) % ECOSYSTEM_STEPS.length)}
+                className="p-3 rounded-2xl bg-[var(--bg-2)] border border-[var(--border)] hover:bg-[var(--bg-3)] hover:text-[var(--accent)] transition-all"
+              >
+                <ChevronLeft size={24} />
+              </button>
+
+              <div className="flex gap-3">
+                {ECOSYSTEM_STEPS.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveStep(i)}
+                    className={cn(
+                      "h-1.5 rounded-full transition-all duration-500",
+                      activeStep === i ? "w-12 bg-[var(--accent)]" : "w-3 bg-[var(--border)]"
+                    )}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => setActiveStep((prev) => (prev + 1) % ECOSYSTEM_STEPS.length)}
+                className="p-3 rounded-2xl bg-[var(--bg-2)] border border-[var(--border)] hover:bg-[var(--bg-3)] hover:text-[var(--accent)] transition-all"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </div>
           </div>
         </div>
       </section>

@@ -114,7 +114,7 @@ class AIService:
         
         return recommendations
 
-    def chat(self, user_message: str) -> Dict:
+    def chat(self, user_message: str, shop_id: int) -> Dict:
         """Handle AI chat queries"""
         # Get context data
         trends = self.analyze_trends()
@@ -123,8 +123,11 @@ class AIService:
         recommendations = self.generate_restock_recommendations()
         
         # Prepare context for AI
+        shop = self.db.query(Shop).filter(Shop.id == shop_id).first()
+        shop_name = shop.name if shop else "Unknown Shop"
+        
         context = f"""
-        Shop Name: {self.db.query(Shop).filter(Shop.id == shop_id).first().name}
+        Shop Name: {shop_name}
         Fast moving items: {trends['fast_moving']}
         High profit items: {trends['high_profit']}
         Current stock situation: {len(recommendations)} items need attention.

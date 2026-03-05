@@ -27,6 +27,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+export interface Suggestion {
+  name: string;
+  type: 'upsell' | 'margin';
+  reason: string;
+}
+
+export interface DeepInsight {
+  id: number;
+  name: string;
+  days_remaining: number;
+  daily_burn_rate: number;
+  restock_score: number;
+  suggested_restock_qty: number;
+}
+
 export interface Item {
   id: number;
   shop_id: number;
@@ -91,23 +106,36 @@ export interface DebtRecord {
 export interface Shop {
   id: number;
   name: string;
+  is_pin_set: boolean;
   created_at: string;
 }
 
 export const authApi = {
-  register: async (name: string, pin: string): Promise<Shop> => {
+  register: async (name: string, password: string): Promise<Shop> => {
     return request<Shop>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, pin }),
+      body: JSON.stringify({ name, password }),
     });
   },
-  login: async (name: string, pin: string): Promise<Shop> => {
+  login: async (name: string, password: string): Promise<Shop> => {
     return request<Shop>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ name, pin }),
+      body: JSON.stringify({ name, password }),
     });
   },
-  updateSettings: async (data: { name?: string; pin?: string }): Promise<Shop> => {
+  setOwnerPin: async (pin: string): Promise<Shop> => {
+    return request<Shop>('/api/auth/set-owner-pin', {
+      method: 'POST',
+      body: JSON.stringify({ pin }),
+    });
+  },
+  verifyOwnerPin: async (pin: string): Promise<{ status: string }> => {
+    return request<{ status: string }>('/api/auth/verify-owner-pin', {
+      method: 'POST',
+      body: JSON.stringify({ pin }),
+    });
+  },
+  updateSettings: async (data: { name?: string; password?: string; owner_pin?: string }): Promise<Shop> => {
     return request<Shop>('/api/shops/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -181,6 +209,18 @@ export const debtApi = {
       method: 'POST',
       body: JSON.stringify(record),
     });
+  },
+  logDebt: async (customerId: number, amount: number, notes?: string): Promise<DebtRecord> => {
+    return request<DebtRecord>('/api/debt/records', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId, amount, type: 'debt', notes }),
+    });
+  },
+  logPayment: async (customerId: number, amount: number, notes?: string): Promise<DebtRecord> => {
+    return request<DebtRecord>('/api/debt/records', {
+      method: 'POST',
+      body: JSON.stringify({ customer_id: customerId, amount, type: 'payment', notes }),
+    });
   }
 };
 
@@ -203,5 +243,14 @@ export const aiApi = {
   },
   getTrends: async (): Promise<any> => {
     return request<any>('/api/ai/trends');
+  },
+  getCustomerRisk: async (customerId: number): Promise<{ risk: 'LOW' | 'MEDIUM' | 'HIGH', current: number, limit: number }> => {
+    return request<{ risk: 'LOW' | 'MEDIUM' | 'HIGH', current: number, limit: number }>(`/api/ai/customer-risk/${customerId}`);
+  },
+  getSuggestions: async (itemId: number): Promise<Suggestion[]> => {
+    return request<Suggestion[]>(`/api/ai/suggestions/${itemId}`);
+  },
+  getDeepInsights: async (): Promise<DeepInsight[]> => {
+    return request<DeepInsight[]>('/api/ai/deep-insights');
   },
 };

@@ -6,7 +6,8 @@ import Navbar from '../../components/Navbar';
 import { itemsApi, aiApi, Item, DeepInsight } from '../../lib/api';
 import { Plus, Edit2, Trash2, AlertTriangle, Package, X, Save, TrendingUp, Info, Zap, Copy, Check } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
-import { isOwnerSessionValid } from '../../lib/auth';
+import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
+import { UserCheck, User as UserIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function StockPage() {
@@ -19,6 +20,7 @@ export default function StockPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [restockQty, setRestockQty] = useState<number>(0);
   const [copied, setCopied] = useState(false);
+  const [role, setRole] = useState<Role>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -36,6 +38,7 @@ export default function StockPage() {
 
   useEffect(() => {
     loadData();
+    setRole(getRole());
   }, []);
 
   const loadData = async () => {
@@ -122,7 +125,7 @@ export default function StockPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex justify-between items-center mb-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
           <div className="flex items-center gap-3">
             <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
               <Package size={24} color="var(--accent)" />
@@ -130,13 +133,29 @@ export default function StockPage() {
             <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Inventory</h1>
           </div>
 
-          <button
-            onClick={() => handleOpenModal('add')}
-            className="btn btn-primary"
-          >
-            <Plus size={18} />
-            NEW_ITEM
-          </button>
+          <div className="flex items-center gap-4">
+            {role && (
+              <div className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
+                role === 'owner'
+                  ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
+                  : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
+              )}>
+                {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
+                <span className="font-display font-bold tracking-widest text-xs uppercase">
+                  {role === 'owner' ? 'Owner' : 'Worker'} Page
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={() => handleOpenModal('add')}
+              className="btn btn-primary"
+            >
+              <Plus size={18} />
+              NEW_ITEM
+            </button>
+          </div>
         </div>
 
         {/* AI Insights Panel */}

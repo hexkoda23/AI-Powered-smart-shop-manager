@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import { salesApi, itemsApi, aiApi, customersApi, debtApi, Item, Sale, Suggestion, Customer } from '../../lib/api';
 import { ShoppingBag, ArrowRight, History, AlertCircle, CheckCircle2, Zap, Sparkles, X, User, CreditCard } from 'lucide-react';
-import { formatCurrency, formatDateTime } from '../../lib/utils';
-import { cn } from '../../lib/utils';
+import { formatCurrency, formatDateTime, cn } from '../../lib/utils';
+import { getRole, Role } from '../../lib/auth';
+import { UserCheck, User as UserIcon } from 'lucide-react';
 
 export default function SalesPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -18,6 +19,7 @@ export default function SalesPage() {
   const [payLater, setPayLater] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customerRisk, setCustomerRisk] = useState<{ risk: 'LOW' | 'MEDIUM' | 'HIGH', current: number, limit: number } | null>(null);
+  const [role, setRole] = useState<Role>(null);
 
   const [formData, setFormData] = useState({
     item_name: '',
@@ -29,6 +31,7 @@ export default function SalesPage() {
 
   useEffect(() => {
     loadData();
+    setRole(getRole());
   }, []);
 
   const loadData = async () => {
@@ -128,11 +131,27 @@ export default function SalesPage() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex items-center gap-3 mb-10">
-          <div style={{ padding: '0.75rem', backgroundColor: 'var(--accent-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
-            <ShoppingBag size={24} color="var(--accent)" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+          <div className="flex items-center gap-3">
+            <div style={{ padding: '0.75rem', backgroundColor: 'var(--accent-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
+              <ShoppingBag size={24} color="var(--accent)" />
+            </div>
+            <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Point of Sale</h1>
           </div>
-          <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Point of Sale</h1>
+
+          {role && (
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500 self-start md:self-auto",
+              role === 'owner'
+                ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
+                : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
+            )}>
+              {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
+              <span className="font-display font-bold tracking-widest text-xs uppercase">
+                {role === 'owner' ? 'Owner' : 'Worker'} Page
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

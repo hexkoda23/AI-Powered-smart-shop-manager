@@ -44,6 +44,9 @@ export function isOwnerSessionValid(): boolean {
 
 export function getRole(): Role {
   if (!isBrowser) return null
+  // No shop session means not authenticated — always return null
+  const shopId = window.localStorage.getItem(SHOP_ID_KEY)
+  if (!shopId) return null
   if (isOwnerSessionValid()) return 'owner'
   try {
     const raw = window.localStorage.getItem(ROLE_KEY)

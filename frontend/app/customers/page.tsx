@@ -7,7 +7,8 @@ import { User, Phone, MapPin, DollarSign, History, Plus, Search, AlertCircle, Ch
 import { formatCurrency, formatDateTime } from '../../lib/utils';
 import { cn } from '../../lib/utils';
 
-import { isOwnerSessionValid } from '../../lib/auth';
+import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
+import { UserCheck, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function CustomersPage() {
@@ -20,6 +21,7 @@ export default function CustomersPage() {
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [amount, setAmount] = useState(0);
     const [notes, setNotes] = useState('');
+    const [role, setRole] = useState<Role>(null);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -36,6 +38,7 @@ export default function CustomersPage() {
 
     useEffect(() => {
         loadCustomers();
+        setRole(getRole());
     }, []);
 
     const loadCustomers = async () => {
@@ -74,7 +77,7 @@ export default function CustomersPage() {
 
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm)
+        (c.phone && c.phone.includes(searchTerm))
     );
 
     const totalReceivables = customers.reduce((sum, c) => sum + c.total_debt, 0);
@@ -84,7 +87,7 @@ export default function CustomersPage() {
             <Navbar />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div className="flex justify-between items-center mb-10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
                     <div className="flex items-center gap-3">
                         <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                             <User size={24} color="var(--accent)" />
@@ -92,10 +95,26 @@ export default function CustomersPage() {
                         <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>CRMs & Debt</h1>
                     </div>
 
-                    <button onClick={() => { setModalType('add'); setShowModal(true); }} className="btn btn-primary">
-                        <Plus size={18} />
-                        ADD_CUSTOMER
-                    </button>
+                    <div className="flex items-center gap-4">
+                        {role && (
+                            <div className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
+                                role === 'owner'
+                                    ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
+                                    : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
+                            )}>
+                                {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
+                                <span className="font-display font-bold tracking-widest text-xs uppercase">
+                                    {role === 'owner' ? 'Owner' : 'Worker'} Page
+                                </span>
+                            </div>
+                        )}
+
+                        <button onClick={() => { setModalType('add'); setShowModal(true); }} className="btn btn-primary">
+                            <Plus size={18} />
+                            ADD_CUSTOMER
+                        </button>
+                    </div>
                 </div>
 
                 {/* Overview Stats */}

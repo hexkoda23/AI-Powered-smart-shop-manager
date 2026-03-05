@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { aiApi } from '../../lib/api';
 import { Send, Bot, User, Sparkles, TrendingUp, Package, Zap, MessageSquare } from 'lucide-react';
-import { isOwnerSessionValid } from '../../lib/auth';
+import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
 import { cn } from '../../lib/utils';
+import { UserCheck, User as UserIcon } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -25,12 +26,14 @@ export default function AssistantPage() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState<Role>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOwnerSessionValid()) {
       router.replace('/login');
     }
+    setRole(getRole());
   }, [router]);
 
   const scrollToBottom = () => {
@@ -99,11 +102,28 @@ export default function AssistantPage() {
               <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '0.25rem' }}>MODE: STRATEGIC_ANALYSIS</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-2">
-            <div
-              style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)', animation: 'pulse 2s infinite' }}
-            />
-            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-2)' }}>SYSTEM_READY</span>
+
+          <div className="flex items-center gap-4">
+            {role && (
+              <div className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
+                role === 'owner'
+                  ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
+                  : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
+              )}>
+                {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
+                <span className="font-display font-bold tracking-widest text-xs uppercase">
+                  {role === 'owner' ? 'Owner' : 'Worker'} Page
+                </span>
+              </div>
+            )}
+
+            <div className="hidden md:flex items-center gap-2">
+              <div
+                style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)', animation: 'pulse 2s infinite' }}
+              />
+              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-2)' }}>SYSTEM_READY</span>
+            </div>
           </div>
         </div>
 

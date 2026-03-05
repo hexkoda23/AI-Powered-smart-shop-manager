@@ -7,18 +7,23 @@ class ShopBase(BaseModel):
     name: str
 
 class ShopCreate(ShopBase):
-    pin: str
+    password: str = Field(..., max_length=10)
 
 class ShopLogin(ShopBase):
-    pin: str
+    password: str
 
 class ShopUpdate(BaseModel):
     name: Optional[str] = None
-    pin: Optional[str] = None
+    password: Optional[str] = None
+    owner_pin: Optional[str] = None
+
+class ShopOwnerPinSetup(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=4)
 
 class ShopResponse(ShopBase):
     id: int
     created_at: datetime
+    is_pin_set: bool
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -12,7 +12,7 @@ from app.schemas import (
     ItemCreate, ItemUpdate, ItemResponse,
     SaleCreate, SaleResponse,
     DashboardStats, AIChatRequest, AIChatResponse,
-    ShopCreate, ShopLogin, ShopResponse, ShopUpdate,
+    ShopCreate, ShopLogin, ShopResponse, ShopUpdate, ShopOwnerPinSetup,
     CustomerCreate, CustomerResponse, DebtRecordCreate, DebtRecordResponse
 )
 from app.ai_service import AIService
@@ -26,13 +26,13 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# PIN Hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password Hashing
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Simplified for multi-shop access
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,20 +52,59 @@ def register_shop(shop: ShopCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Store name already registered")
     
-    hashed_pin = pwd_context.hash(shop.pin)
-    db_shop = Shop(name=shop.name, pin_hash=hashed_pin)
+    hashed_password = pwd_context.hash(shop.password)
+    db_shop = Shop(name=shop.name, password_hash=hashed_password)
     db.add(db_shop)
     db.commit()
     db.refresh(db_shop)
+    
+    # Add attributes for schema response
+    db_shop.is_pin_set = False
     return db_shop
 
 
 @app.post("/api/auth/login", response_model=ShopResponse)
 def login_shop(login: ShopLogin, db: Session = Depends(get_db)):
     db_shop = db.query(Shop).filter(Shop.name == login.name).first()
-    if not db_shop or not pwd_context.verify(login.pin, db_shop.pin_hash):
-        raise HTTPException(status_code=401, detail="Invalid store name or PIN")
-    return db_shop
+    if not db_shop or not pwd_context.verify(login.password, db_shop.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid store name or password")
+    
+    return {
+        "id": db_shop.id,
+        "name": db_shop.name,
+        "created_at": db_shop.created_at,
+        "is_pin_set": db_shop.pin_hash is not None
+    }
+
+
+@app.post("/api/auth/set-owner-pin", response_model=ShopResponse)
+def set_owner_pin(setup: ShopOwnerPinSetup, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    db_shop = db.query(Shop).filter(Shop.id == x_shop_id).first()
+    if not db_shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    db_shop.pin_hash = pwd_context.hash(setup.pin)
+    db.commit()
+    db.refresh(db_shop)
+    
+    return {
+        "id": db_shop.id,
+        "name": db_shop.name,
+        "created_at": db_shop.created_at,
+        "is_pin_set": True
+    }
+
+
+@app.post("/api/auth/verify-owner-pin")
+def verify_owner_pin(setup: ShopOwnerPinSetup, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    db_shop = db.query(Shop).filter(Shop.id == x_shop_id).first()
+    if not db_shop or not db_shop.pin_hash:
+        raise HTTPException(status_code=401, detail="PIN not set")
+    
+    if not pwd_context.verify(setup.pin, db_shop.pin_hash):
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    
+    return {"status": "success"}
 
 
 @app.put("/api/shops/settings", response_model=ShopResponse)
@@ -75,18 +114,26 @@ def update_shop_settings(shop_update: ShopUpdate, x_shop_id: int = Header(...), 
         raise HTTPException(status_code=404, detail="Shop not found")
     
     if shop_update.name:
-        # Check if name already taken
         existing = db.query(Shop).filter(Shop.name == shop_update.name, Shop.id != x_shop_id).first()
         if existing:
             raise HTTPException(status_code=400, detail="Store name already taken")
         db_shop.name = shop_update.name
     
-    if shop_update.pin:
-        db_shop.pin_hash = pwd_context.hash(shop_update.pin)
+    if shop_update.password:
+        db_shop.password_hash = pwd_context.hash(shop_update.password)
+    
+    if shop_update.owner_pin:
+        db_shop.pin_hash = pwd_context.hash(shop_update.owner_pin)
     
     db.commit()
     db.refresh(db_shop)
-    return db_shop
+    
+    return {
+        "id": db_shop.id,
+        "name": db_shop.name,
+        "created_at": db_shop.created_at,
+        "is_pin_set": db_shop.pin_hash is not None
+    }
 
 
 # --- Items Endpoints ---
@@ -279,37 +326,41 @@ def get_dashboard_stats(x_shop_id: int = Header(...), db: Session = Depends(get_
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)
     
-    shop_sales = db.query(Sale).filter(Sale.shop_id == x_shop_id).join(Item).all()
-    
-    daily_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= today_start)
-    weekly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= week_start)
-    monthly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= month_start)
-    
-    total_sales_today = sum(s.quantity for s in shop_sales if s.sale_date >= today_start)
-    total_sales_week = sum(s.quantity for s in shop_sales if s.sale_date >= week_start)
-    total_sales_month = sum(s.quantity for s in shop_sales if s.sale_date >= month_start)
-    
-    low_stock_items = db.query(Item).filter(Item.shop_id == x_shop_id, Item.current_stock <= Item.low_stock_threshold).all()
-    
-    best_selling = db.query(Item.name, func.sum(Sale.quantity).label('total_quantity'))\
-        .join(Sale).filter(Sale.shop_id == x_shop_id, Sale.sale_date >= month_start)\
-        .group_by(Item.name).order_by(desc('total_quantity')).limit(5).all()
-    
-    slow_moving = db.query(Item.name, func.coalesce(func.sum(Sale.quantity), 0).label('total_quantity'))\
-        .outerjoin(Sale, Sale.item_id == Item.id).filter(Item.shop_id == x_shop_id)\
-        .group_by(Item.name).order_by('total_quantity').limit(5).all()
-    
-    return DashboardStats(
-        daily_profit=daily_profit,
-        weekly_profit=weekly_profit,
-        monthly_profit=monthly_profit,
-        total_sales_today=total_sales_today,
-        total_sales_week=total_sales_week,
-        total_sales_month=total_sales_month,
-        low_stock_items=low_stock_items,
-        best_selling_items=[{"name": name, "quantity": int(qty)} for name, qty in best_selling],
-        slow_moving_items=[{"name": name, "quantity": int(qty)} for name, qty in slow_moving]
-    )
+    try:
+        shop_sales = db.query(Sale).filter(Sale.shop_id == x_shop_id).join(Item).all()
+        
+        daily_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= today_start)
+        weekly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= week_start)
+        monthly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= month_start)
+        
+        total_sales_today = sum(s.quantity for s in shop_sales if s.sale_date >= today_start)
+        total_sales_week = sum(s.quantity for s in shop_sales if s.sale_date >= week_start)
+        total_sales_month = sum(s.quantity for s in shop_sales if s.sale_date >= month_start)
+        
+        low_stock_items = db.query(Item).filter(Item.shop_id == x_shop_id, Item.current_stock <= Item.low_stock_threshold).all()
+        
+        best_selling = db.query(Item.name, func.sum(Sale.quantity).label('total_quantity'))\
+            .join(Sale).filter(Sale.shop_id == x_shop_id, Sale.sale_date >= month_start)\
+            .group_by(Item.name).order_by(desc('total_quantity')).limit(5).all()
+        
+        slow_moving = db.query(Item.name, func.coalesce(func.sum(Sale.quantity), 0).label('total_quantity'))\
+            .outerjoin(Sale, Sale.item_id == Item.id).filter(Item.shop_id == x_shop_id)\
+            .group_by(Item.name).order_by('total_quantity').limit(5).all()
+        
+        return DashboardStats(
+            daily_profit=daily_profit,
+            weekly_profit=weekly_profit,
+            monthly_profit=monthly_profit,
+            total_sales_today=total_sales_today,
+            total_sales_week=total_sales_week,
+            total_sales_month=total_sales_month,
+            low_stock_items=low_stock_items,
+            best_selling_items=[{"name": name, "quantity": int(qty or 0)} for name, qty in best_selling],
+            slow_moving_items=[{"name": name, "quantity": int(qty or 0)} for name, qty in slow_moving]
+        )
+    except Exception as e:
+        print(f"DASHBOARD_ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database integration error: {str(e)}")
 
 
 @app.post("/api/ai/chat", response_model=AIChatResponse)

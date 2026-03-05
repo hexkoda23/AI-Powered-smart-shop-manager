@@ -9,7 +9,8 @@ class Shop(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
-    pin_hash = Column(String, nullable=False)  # Storing hashed PIN
+    password_hash = Column(String, nullable=False)  # Alphanumeric password
+    pin_hash = Column(String, nullable=True)  # Null until owner sets it
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     items = relationship("Item", back_populates="shop")

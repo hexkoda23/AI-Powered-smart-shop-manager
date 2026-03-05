@@ -5,20 +5,30 @@ import Navbar from '../../components/Navbar';
 import StatCard from '../../components/StatCard';
 import { DashboardStats } from '../../lib/api';
 import { dashboardApi } from '../../lib/api';
-import { getShopContext } from '../../lib/auth';
-import { DollarSign, TrendingUp, Package, AlertTriangle, Calendar, ShoppingCart, Info } from 'lucide-react';
+import { getShopContext, getRole, Role, isOwnerSessionValid } from '../../lib/auth';
+import { useRouter } from 'next/navigation';
+import { DollarSign, TrendingUp, Package, AlertTriangle, Calendar, ShoppingCart, Info, UserCheck, User as UserIcon, RefreshCcw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { cn } from '../../lib/utils';
 
 export default function DashboardPage() {
+    const router = useRouter();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeStore, setActiveStore] = useState('Default');
+    const [role, setRole] = useState<Role>(null);
 
     useEffect(() => {
-        loadStats();
         const context = getShopContext();
+        if (!context.id) {
+            router.replace('/login');
+            return;
+        }
+
+        loadStats();
         if (context.name) setActiveStore(context.name);
-    }, []);
+        setRole(getRole());
+    }, [router]);
 
     const loadStats = async () => {
         try {
@@ -52,10 +62,29 @@ export default function DashboardPage() {
             <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
                 <Navbar />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-                    <div className="card border-[var(--danger)] text-center">
-                        <h2 style={{ color: 'var(--danger)' }}>DATABASE_CONNECTION_ERROR</h2>
-                        <p style={{ color: 'var(--text-2)', marginTop: '1rem' }}>Failed to retrieve dashboard metrics.</p>
-                        <button onClick={loadStats} className="btn btn-primary mt-6 mx-auto">RETRY_FETCH</button>
+                    <div className="card border-[var(--danger)]/30 text-center max-w-xl mx-auto py-16">
+                        <div className="w-20 h-20 rounded-full bg-[var(--danger)]/10 flex items-center justify-center mx-auto mb-6">
+                            <AlertTriangle size={40} color="var(--danger)" />
+                        </div>
+                        <h2 style={{ color: 'var(--white)', fontSize: '1.75rem', marginBottom: '0.5rem' }}>DASHBOARD_SYNC_FAILURE</h2>
+                        <p style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginBottom: '2rem' }}>
+                            We encountered a problem establishing a secure connection to your shop database. This may be due to an expired session or temporary system maintenance.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={() => { setLoading(true); loadStats(); }}
+                                className="btn btn-primary flex items-center justify-center gap-2 px-8"
+                            >
+                                <RefreshCcw size={18} />
+                                RETRY_CONNECTION
+                            </button>
+                            <button
+                                onClick={() => router.push('/login')}
+                                className="btn btn-outline px-8"
+                            >
+                                RE-AUTHENTICATE
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -85,7 +114,21 @@ export default function DashboardPage() {
                         <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Overview</h1>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                        {role && (
+                            <div className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
+                                role === 'owner'
+                                    ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
+                                    : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
+                            )}>
+                                {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
+                                <span className="font-display font-bold tracking-widest text-xs uppercase">
+                                    {role === 'owner' ? 'Owner' : 'Worker'} Page
+                                </span>
+                            </div>
+                        )}
+
                         <div className="card p-3 flex items-center gap-3" style={{ padding: '0.75rem 1.25rem' }}>
                             <Calendar size={18} color="var(--accent)" />
                             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
