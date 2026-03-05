@@ -40,19 +40,7 @@ app.add_middleware(
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-from sqlalchemy import text
 
-@app.get("/api/migrate-db")
-def migrate_db(db: Session = Depends(get_db)):
-    try:
-        db.execute(text("ALTER TABLE items RENAME COLUMN unit_price TO selling_price;"))
-        db.commit()
-        return {"message": "Migration successful!"}
-    except Exception as e:
-        return {"message": f"Migration failed: {str(e)}"}
 
 @app.get("/")
 def root():
