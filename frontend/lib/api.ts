@@ -48,7 +48,7 @@ export interface Item {
   name: string;
   current_stock: number;
   low_stock_threshold: number;
-  unit_price: number;
+  selling_price: number;
   cost_price: number;
   created_at: string;
   updated_at?: string;

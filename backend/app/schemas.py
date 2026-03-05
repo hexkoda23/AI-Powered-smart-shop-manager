@@ -31,7 +31,7 @@ class ItemBase(BaseModel):
     name: str
     current_stock: int = 0
     low_stock_threshold: int = 10
-    unit_price: float = 0.0
+    selling_price: float = 0.0
     cost_price: float = 0.0
 
 class ItemCreate(ItemBase):
@@ -41,7 +41,7 @@ class ItemUpdate(BaseModel):
     name: Optional[str] = None
     current_stock: Optional[int] = None
     low_stock_threshold: Optional[int] = None
-    unit_price: Optional[float] = None
+    selling_price: Optional[float] = None
     cost_price: Optional[float] = None
 
 class ItemResponse(ItemBase):

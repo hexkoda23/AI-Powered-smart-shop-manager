@@ -25,7 +25,7 @@ class Item(Base):
     name = Column(String, index=True, nullable=False) # Name is unique per shop now
     current_stock = Column(Integer, default=0)
     low_stock_threshold = Column(Integer, default=10)
-    unit_price = Column(Float, default=0.0)
+    selling_price = Column(Float, default=0.0)
     cost_price = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -26,7 +26,7 @@ export default function StockPage() {
     name: '',
     current_stock: 0,
     low_stock_threshold: 10,
-    unit_price: 0,
+    selling_price: 0,
     cost_price: 0,
   });
 
@@ -62,13 +62,13 @@ export default function StockPage() {
         name: item.name,
         current_stock: item.current_stock,
         low_stock_threshold: item.low_stock_threshold,
-        unit_price: item.unit_price,
+        selling_price: item.selling_price,
         cost_price: item.cost_price,
       });
     } else if (type === 'restock' && item) {
       setRestockQty(0);
     } else {
-      setFormData({ name: '', current_stock: 0, low_stock_threshold: 10, unit_price: 0, cost_price: 0 });
+      setFormData({ name: '', current_stock: 0, low_stock_threshold: 10, selling_price: 0, cost_price: 0 });
     }
     setShowModal(true);
   };
@@ -272,7 +272,7 @@ export default function StockPage() {
                   {items.map((item) => {
                     const insight = insights.find(ins => ins.id === item.id);
                     const isLow = item.current_stock <= item.low_stock_threshold || (insight && insight.days_remaining <= 7);
-                    const margin = ((item.unit_price - item.cost_price) / item.unit_price) * 100;
+                    const margin = ((item.selling_price - item.cost_price) / item.selling_price) * 100;
                     return (
                       <tr key={item.id}>
                         <td>
@@ -408,25 +408,25 @@ export default function StockPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>UNIT_PRICE</label>
+                      <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>SELLING_PRICE</label>
                       <input
                         type="number"
-                        value={formData.unit_price}
-                        onChange={(e) => setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })}
+                        value={formData.selling_price}
+                        onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) || 0 })}
                         className="input w-full"
                         required
                       />
                     </div>
                   </div>
 
-                  {formData.unit_price > 0 && (
+                  {formData.selling_price > 0 && (
                     <div className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <TrendingUp size={16} color="var(--accent)" />
                         <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Projected Margin</span>
                       </div>
                       <span style={{ color: 'var(--accent)', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
-                        {(((formData.unit_price - formData.cost_price) / formData.unit_price) * 100).toFixed(1)}%
+                        {(((formData.selling_price - formData.cost_price) / formData.selling_price) * 100).toFixed(1)}%
                       </span>
                     </div>
                   )}
