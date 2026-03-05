@@ -5,12 +5,12 @@ from typing import List, Dict, Optional
 from groq import Groq
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.models import Sale, Item
+from app.models import Sale, Item, Shop
 from dotenv import load_dotenv
 
 load_dotenv()
 
-groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key = os.getenv("notable")
 client = Groq(api_key=groq_api_key) if groq_api_key else None
 
 
@@ -136,7 +136,7 @@ class AIService:
         
         if not client:
             return {
-                'response': f"Based on your shop data: {user_message}. Please ensure your GROQ_API_KEY is configured in the .env file for AI-powered insights.",
+                'response': f"Based on your shop data: {user_message}. Please ensure your 'notable' API key is configured in the .env file for AI-powered insights.",
                 'insights': [], # Simplified fallback
                 'recommendations': recommendations[:3]
             }
@@ -174,7 +174,7 @@ class AIService:
             }
         except Exception as e:
             return {
-                'response': f"I encountered an error while connecting to Groq: {str(e)}. Please check your GROQ_API_KEY configuration.",
+                'response': f"I encountered an error while connecting to Groq: {str(e)}. Please check your 'notable' API key configuration.",
                 'insights': [],
                 'recommendations': recommendations[:3]
             }
