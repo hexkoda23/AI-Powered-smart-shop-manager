@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
-import { verifyOwnerPin, setOwnerSession, getRole, setOwnerPin, isOwnerSessionValid } from '../../lib/auth';
+import { setOwnerSession, getRole, isOwnerSessionValid } from '../../lib/auth';
+import { authApi } from '../../lib/api';
 import { ShieldCheck, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -27,26 +28,29 @@ export default function AdminPage() {
     }
   }, [router]);
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (verifyOwnerPin(pin)) {
+    try {
+      await authApi.verifyOwnerPin(pin);
       setOwnerSession(true);
       setAuthed(true);
       setPin('');
       router.refresh();
       router.push('/dashboard');
-    } else {
+    } catch {
       setError('ACCESS_DENIED: INVALID_CREDENTIALS');
     }
   };
 
-  const handleUpdatePin = (e: React.FormEvent) => {
+  const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinSuccess('');
     setError('');
 
-    if (!verifyOwnerPin(currentPin)) {
+    try {
+      await authApi.verifyOwnerPin(currentPin);
+    } catch {
       setError('AUTH_FAILED: CURRENT_PIN_INCORRECT');
       return;
     }
@@ -62,11 +66,15 @@ export default function AdminPage() {
       return;
     }
 
-    setOwnerPin(newPin);
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
-    setPinSuccess('SECURITY_CREDENTIALS_UPDATED');
+    try {
+      await authApi.setOwnerPin(newPin);
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      setPinSuccess('SECURITY_CREDENTIALS_UPDATED');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'FAILED_TO_UPDATE_PIN');
+    }
   };
 
   return (

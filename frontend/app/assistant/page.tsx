@@ -259,12 +259,12 @@ export default function AssistantPage() {
               <div className="space-y-4">
                 <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
-                    "Sales for **Indomie** peak between 4 PM - 7 PM. Consider running a bundle deal on eggs."
+                    &quot;Sales for **Indomie** peak between 4 PM - 7 PM. Consider running a bundle deal on eggs.&quot;
                   </p>
                 </div>
                 <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
-                    "Your cash liquidity is high. Optimal time for a total stock refresh."
+                    &quot;Your cash liquidity is high. Optimal time for a total stock refresh.&quot;
                   </p>
                 </div>
               </div>
