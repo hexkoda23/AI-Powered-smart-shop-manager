@@ -461,14 +461,14 @@ export default function StockPage() {
                   onClick={() => setShowModal(false)}
                   className="btn btn-outline flex-1 py-3"
                 >
-                  CANCEL_OP
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary flex-1 py-3"
                 >
-                  {loading ? 'EXECUTING...' : 'COMMIT_CHANGES'}
+                  {loading ? 'EXECUTING...' : 'Save'}
                 </button>
               </div>
             </form>

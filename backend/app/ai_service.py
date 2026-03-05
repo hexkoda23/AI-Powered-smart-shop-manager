@@ -114,6 +114,46 @@ class AIService:
         
         return recommendations
 
+    def get_deep_insights(self) -> List[Dict]:
+        """Generate deep insights for inventory items"""
+        items = self.db.query(Item).all()
+        insights = []
+        
+        for item in items:
+            sales_30d = self.db.query(func.sum(Sale.quantity)).filter(
+                Sale.item_id == item.id,
+                Sale.sale_date >= datetime.now() - timedelta(days=30)
+            ).scalar() or 0
+            
+            daily_burn_rate = round(sales_30d / 30.0, 1)
+            
+            if daily_burn_rate > 0:
+                days_remaining = int(item.current_stock / daily_burn_rate)
+            else:
+                days_remaining = 999
+                
+            if item.current_stock == 0:
+                restock_score = 100
+            elif days_remaining <= 7 or item.current_stock <= item.low_stock_threshold:
+                restock_score = min(100, max(50, int(100 - (days_remaining * 5))))
+            else:
+                restock_score = max(0, int(30 - (days_remaining)))
+                
+            suggested_restock_qty = int(daily_burn_rate * 30)
+            if suggested_restock_qty < item.low_stock_threshold * 2:
+                suggested_restock_qty = item.low_stock_threshold * 2
+                
+            insights.append({
+                "id": item.id,
+                "name": item.name,
+                "days_remaining": days_remaining,
+                "daily_burn_rate": daily_burn_rate,
+                "restock_score": restock_score,
+                "suggested_restock_qty": suggested_restock_qty
+            })
+            
+        return insights
+
     def chat(self, user_message: str, shop_id: int) -> Dict:
         """Handle AI chat queries"""
         # Get context data

@@ -383,6 +383,13 @@ def get_restock_recommendations(db: Session = Depends(get_db)):
     return {"recommendations": recommendations}
 
 
+@app.get("/api/ai/deep-insights")
+def get_deep_insights(db: Session = Depends(get_db)):
+    ai_service = AIService(db)
+    insights = ai_service.get_deep_insights()
+    return insights
+
+
 @app.get("/api/ai/trends")
 def get_trends(db: Session = Depends(get_db)):
     ai_service = AIService(db)
