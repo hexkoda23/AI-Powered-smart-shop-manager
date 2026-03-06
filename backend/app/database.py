@@ -12,6 +12,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./shop.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Debug: Print masked URL to verify host
+if DATABASE_URL.startswith("postgresql"):
+    masked_url = f"{DATABASE_URL[:20]}...{DATABASE_URL[-15:]}"
+    print(f"DATABASE_URL detected: {masked_url}")
+else:
+    print(f"DATABASE_URL detected: {DATABASE_URL}")
+
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         DATABASE_URL, connect_args={"check_same_thread": False}
