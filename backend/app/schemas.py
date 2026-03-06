@@ -59,6 +59,10 @@ class SaleCreate(BaseModel):
     selling_price: float = Field(gt=0)
     sale_date: Optional[datetime] = None
 
+class SaleUpdate(BaseModel):
+    quantity: int = Field(gt=0)
+    selling_price: float = Field(gt=0)
+
 class SaleResponse(BaseModel):
     id: int
     shop_id: int

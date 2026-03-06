@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../../components/Navbar';
 import { salesApi, itemsApi, aiApi, customersApi, debtApi, Item, Sale, Suggestion, Customer } from '../../lib/api';
-import { ShoppingBag, ArrowRight, History, AlertCircle, CheckCircle2, Zap, Sparkles, X, User, CreditCard } from 'lucide-react';
+import { ShoppingBag, ArrowRight, History, AlertCircle, CheckCircle2, Zap, Sparkles, X, User, CreditCard, Edit2, Trash2 } from 'lucide-react';
 import { formatCurrency, formatDateTime, cn } from '../../lib/utils';
 import { getRole, Role } from '../../lib/auth';
 import { UserCheck, User as UserIcon } from 'lucide-react';
@@ -31,6 +31,7 @@ export default function SalesPage() {
   });
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
+  const [editingSaleId, setEditingSaleId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -67,6 +68,41 @@ export default function SalesPage() {
     }
   };
 
+  const handleEditClick = (sale: Sale) => {
+    setEditingSaleId(sale.id);
+    setFormData({
+      item_name: sale.item_name,
+      quantity: sale.quantity,
+      selling_price: sale.selling_price,
+    });
+    setPayLater(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteClick = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this sale? This will restore the items to inventory.')) {
+      setLoading(true);
+      try {
+        await salesApi.delete(id);
+        if (editingSaleId === id) {
+          setEditingSaleId(null);
+          setFormData({ item_name: '', quantity: 0, selling_price: 0 });
+        }
+        await loadData();
+      } catch (error: any) {
+        setError(error?.response?.data?.detail || 'FAILED_TO_DELETE_SALE');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingSaleId(null);
+    setFormData({ item_name: '', quantity: 0, selling_price: 0 });
+    setError('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -80,35 +116,43 @@ export default function SalesPage() {
         return;
       }
 
-      const total = formData.quantity * formData.selling_price;
+      if (editingSaleId) {
+        await salesApi.update(editingSaleId, {
+          quantity: formData.quantity,
+          selling_price: formData.selling_price
+        });
+        setEditingSaleId(null);
+      } else {
+        const total = formData.quantity * formData.selling_price;
 
-      if (payLater && !customerName.trim()) {
-        setError('CUSTOMER_NAME_REQUIRED_FOR_CREDIT');
-        setLoading(false);
-        return;
-      }
-
-      await salesApi.create(formData);
-
-      if (payLater) {
-        let finalCustomerId = selectedCustomerId;
-
-        // Auto-create customer if they don't exist
-        if (!finalCustomerId) {
-          try {
-            const newCustomer = await customersApi.create({
-              name: customerName,
-              phone: customerPhone || '0000000000'
-            });
-            finalCustomerId = newCustomer.id;
-          } catch (err) {
-            setError('FAILED_TO_CREATE_CUSTOMER');
-            setLoading(false);
-            return;
-          }
+        if (payLater && !customerName.trim()) {
+          setError('CUSTOMER_NAME_REQUIRED_FOR_CREDIT');
+          setLoading(false);
+          return;
         }
 
-        await debtApi.logDebt(finalCustomerId, total, `Credit sale: ${formData.item_name} x ${formData.quantity}`);
+        await salesApi.create(formData);
+
+        if (payLater) {
+          let finalCustomerId = selectedCustomerId;
+
+          // Auto-create customer if they don't exist
+          if (!finalCustomerId) {
+            try {
+              const newCustomer = await customersApi.create({
+                name: customerName,
+                phone: customerPhone || '0000000000'
+              });
+              finalCustomerId = newCustomer.id;
+            } catch (err) {
+              setError('FAILED_TO_CREATE_CUSTOMER');
+              setLoading(false);
+              return;
+            }
+          }
+
+          await debtApi.logDebt(finalCustomerId, total, `Credit sale: ${formData.item_name} x ${formData.quantity}`);
+        }
       }
 
       setFormData({ item_name: '', quantity: 0, selling_price: 0 });
@@ -191,8 +235,12 @@ export default function SalesPage() {
           <div className="lg:col-span-5 space-y-6">
             <div className="card" style={{ borderTop: success ? '4px solid var(--accent)' : error ? '4px solid var(--danger)' : '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-8">
-                <h3 style={{ fontSize: '1.25rem' }}>Record Transaction</h3>
-                <span className="badge badge-info">Manual Entry</span>
+                <h3 style={{ fontSize: '1.25rem' }}>{editingSaleId ? 'Edit Transaction' : 'Record Transaction'}</h3>
+                {editingSaleId ? (
+                  <button type="button" onClick={cancelEdit} className="badge badge-danger hover:opacity-80 transition-opacity cursor-pointer">Cancel Edit</button>
+                ) : (
+                  <span className="badge badge-info">Manual Entry</span>
+                )}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -221,6 +269,7 @@ export default function SalesPage() {
                     className="input w-full"
                     placeholder="Search or select stock item..."
                     required
+                    disabled={!!editingSaleId}
                   />
                   <datalist id="items-list">
                     {items.map((item) => (
@@ -271,77 +320,79 @@ export default function SalesPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] border-dashed">
-                  <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={payLater}
-                        onChange={(e) => setPayLater(e.target.checked)}
-                        className="w-4 h-4 rounded border-[var(--border)] bg-[var(--bg)] text-[var(--accent)]"
-                      />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>RECORD AS CREDIT SALE</span>
-                    </label>
-                    <CreditCard size={18} color={payLater ? "var(--accent)" : "var(--text-3)"} />
-                  </div>
-
-                  {payLater && (
-                    <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
-                      <div className="space-y-2">
-                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>CUSTOMER_NAME</label>
+                {!editingSaleId && (
+                  <div className="flex flex-col gap-4 p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] border-dashed">
+                    <div className="flex justify-between items-center">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
-                          list="customer-list"
-                          type="text"
-                          className="input w-full"
-                          value={customerName}
-                          onChange={(e) => handleCustomerSelect(e.target.value)}
-                          placeholder="Search or enter new name..."
-                          required
+                          type="checkbox"
+                          checked={payLater}
+                          onChange={(e) => setPayLater(e.target.checked)}
+                          className="w-4 h-4 rounded border-[var(--border)] bg-[var(--bg)] text-[var(--accent)]"
                         />
-                        <datalist id="customer-list">
-                          {customers.map(c => (
-                            <option key={c.id} value={c.name} />
-                          ))}
-                        </datalist>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>PHONE_NUMBER (OPTIONAL)</label>
-                        <input
-                          type="text"
-                          className="input w-full"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          placeholder="e.g. 08012345678"
-                        />
-                      </div>
-
-                      {customerRisk && (
-                        <div className={cn(
-                          "p-3 rounded-[var(--radius)] border flex flex-col gap-2",
-                          customerRisk.risk === 'HIGH' ? "bg-red-950/20 border-red-500/30" : "bg-blue-950/20 border-blue-500/30"
-                        )}>
-                          <div className="flex justify-between items-center">
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>DEBT_STATUS: {customerRisk.risk}</span>
-                            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>{((customerRisk.current / customerRisk.limit) * 100).toFixed(0)}% LIMIT_USED</span>
-                          </div>
-                          <div className="w-full bg-black/40 h-1 rounded-full overflow-hidden">
-                            <div
-                              className={cn("h-full", customerRisk.risk === 'HIGH' ? "bg-[var(--danger)]" : "bg-[var(--accent)]")}
-                              style={{ width: `${Math.min(100, (customerRisk.current / customerRisk.limit) * 100)}%` }}
-                            />
-                          </div>
-                          {customerRisk.risk === 'HIGH' && (
-                            <div className="flex items-center gap-2 text-[var(--danger)]">
-                              <AlertCircle size={12} />
-                              <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>CREDIT_LIMIT_NEARLY_EXCEEDED</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>RECORD AS CREDIT SALE</span>
+                      </label>
+                      <CreditCard size={18} color={payLater ? "var(--accent)" : "var(--text-3)"} />
                     </div>
-                  )}
-                </div>
+
+                    {payLater && (
+                      <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-2">
+                          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>CUSTOMER_NAME</label>
+                          <input
+                            list="customer-list"
+                            type="text"
+                            className="input w-full"
+                            value={customerName}
+                            onChange={(e) => handleCustomerSelect(e.target.value)}
+                            placeholder="Search or enter new name..."
+                            required
+                          />
+                          <datalist id="customer-list">
+                            {customers.map(c => (
+                              <option key={c.id} value={c.name} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)' }}>PHONE_NUMBER (OPTIONAL)</label>
+                          <input
+                            type="text"
+                            className="input w-full"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            placeholder="e.g. 08012345678"
+                          />
+                        </div>
+
+                        {customerRisk && (
+                          <div className={cn(
+                            "p-3 rounded-[var(--radius)] border flex flex-col gap-2",
+                            customerRisk.risk === 'HIGH' ? "bg-red-950/20 border-red-500/30" : "bg-blue-950/20 border-blue-500/30"
+                          )}>
+                            <div className="flex justify-between items-center">
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>DEBT_STATUS: {customerRisk.risk}</span>
+                              <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>{((customerRisk.current / customerRisk.limit) * 100).toFixed(0)}% LIMIT_USED</span>
+                            </div>
+                            <div className="w-full bg-black/40 h-1 rounded-full overflow-hidden">
+                              <div
+                                className={cn("h-full", customerRisk.risk === 'HIGH' ? "bg-[var(--danger)]" : "bg-[var(--accent)]")}
+                                style={{ width: `${Math.min(100, (customerRisk.current / customerRisk.limit) * 100)}%` }}
+                              />
+                            </div>
+                            {customerRisk.risk === 'HIGH' && (
+                              <div className="flex items-center gap-2 text-[var(--danger)]">
+                                <AlertCircle size={12} />
+                                <span style={{ fontSize: '0.65rem', fontWeight: 600 }}>CREDIT_LIMIT_NEARLY_EXCEEDED</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="p-6 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--accent)] border-dashed flex justify-between items-center group overflow-hidden relative">
                   <div style={{ position: 'absolute', top: 0, right: 0, width: '60px', height: '100%', backgroundColor: 'var(--accent)', opacity: 0.05, transform: 'skewX(-20deg) translateX(20px)' }} />
@@ -359,7 +410,7 @@ export default function SalesPage() {
                   disabled={loading}
                   className="btn btn-primary w-full py-4 text-lg"
                 >
-                  {loading ? 'PROCESSING...' : 'COMPLETE SALE'}
+                  {loading ? 'PROCESSING...' : (editingSaleId ? 'UPDATE SALE' : 'COMPLETE SALE')}
                 </button>
               </form>
             </div>
@@ -399,6 +450,7 @@ export default function SalesPage() {
                       <th className="text-right">UNIT_VAL</th>
                       <th className="text-right">EXTENDED_VAL</th>
                       <th className="text-right">TIMESTAMP</th>
+                      <th className="text-center">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -423,6 +475,26 @@ export default function SalesPage() {
                             {formatDateTime(sale.sale_date).replace(/, \d{4}/, '')}
                           </span>
                         </td>
+                        <td className="text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(sale)}
+                              className="p-1.5 rounded-md hover:bg-[var(--accent)] hover:text-black text-[var(--text-3)] transition-colors"
+                              title="Edit Sale"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(sale.id)}
+                              className="p-1.5 rounded-md hover:bg-[var(--danger)] hover:text-white text-[var(--text-3)] transition-colors"
+                              title="Delete Sale"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -431,7 +503,7 @@ export default function SalesPage() {
             )}
 
             <button className="btn btn-outline w-full mt-auto" style={{ marginTop: '2rem' }}>
-              RECONCILE_AND_EXPORT
+              BROWSE_FULL_HISTORY
             </button>
           </div>
         </div>

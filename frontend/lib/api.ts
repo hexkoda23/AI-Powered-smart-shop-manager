@@ -186,6 +186,17 @@ export const salesApi = {
       body: JSON.stringify({ ...sale, shop_id: shopId ? parseInt(shopId) : 0 }),
     });
   },
+  update: async (id: number, sale: { quantity: number; selling_price: number }): Promise<Sale> => {
+    return request<Sale>(`/api/sales/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(sale),
+    });
+  },
+  delete: async (id: number): Promise<void> => {
+    return request<void>(`/api/sales/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const customersApi = {

@@ -11,7 +11,7 @@ from app.database import get_db, engine, Base
 from app.models import Item, Sale, StockHistory, Shop, Customer, DebtRecord
 from app.schemas import (
     ItemCreate, ItemUpdate, ItemResponse,
-    SaleCreate, SaleResponse,
+    SaleCreate, SaleResponse, SaleUpdate,
     DashboardStats, AIChatRequest, AIChatResponse,
     ShopCreate, ShopLogin, ShopResponse, ShopUpdate, ShopOwnerPinSetup,
     CustomerCreate, CustomerResponse, DebtRecordCreate, DebtRecordResponse
@@ -253,6 +253,75 @@ def create_sale(sale: SaleCreate, x_shop_id: int = Header(...), db: Session = De
         "sale_date": db_sale.sale_date,
         "created_at": db_sale.created_at
     }
+
+
+@app.put("/api/sales/{sale_id}", response_model=SaleResponse)
+def update_sale(sale_id: int, sale_update: SaleUpdate, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    db_sale = db.query(Sale).filter(Sale.id == sale_id, Sale.shop_id == x_shop_id).first()
+    if not db_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    
+    item = db.query(Item).filter(Item.id == db_sale.item_id).first()
+    
+    # Revert old sale quantity from stock
+    item.current_stock += db_sale.quantity
+    
+    # Apply new sale quantity to stock
+    item.current_stock = max(0, item.current_stock - sale_update.quantity)
+    
+    # Log stock history
+    diff = db_sale.quantity - sale_update.quantity
+    if diff != 0:
+        stock_history = StockHistory(
+            item_id=item.id,
+            shop_id=x_shop_id,
+            quantity_change=diff,
+            change_type='adjustment',
+            notes=f"Sale updated: {db_sale.quantity} -> {sale_update.quantity}"
+        )
+        db.add(stock_history)
+        
+    db_sale.quantity = sale_update.quantity
+    db_sale.selling_price = sale_update.selling_price
+    
+    db.commit()
+    db.refresh(db_sale)
+    
+    return {
+        "id": db_sale.id,
+        "shop_id": db_sale.shop_id,
+        "item_id": db_sale.item_id,
+        "item_name": item.name,
+        "quantity": db_sale.quantity,
+        "selling_price": db_sale.selling_price,
+        "sale_date": db_sale.sale_date,
+        "created_at": db_sale.created_at
+    }
+
+
+@app.delete("/api/sales/{sale_id}")
+def delete_sale(sale_id: int, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    db_sale = db.query(Sale).filter(Sale.id == sale_id, Sale.shop_id == x_shop_id).first()
+    if not db_sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+        
+    item = db.query(Item).filter(Item.id == db_sale.item_id).first()
+    
+    # Restore stock
+    item.current_stock += db_sale.quantity
+    
+    stock_history = StockHistory(
+        item_id=item.id,
+        shop_id=x_shop_id,
+        quantity_change=db_sale.quantity,
+        change_type='adjustment',
+        notes=f"Sale deleted. Restored {db_sale.quantity} units."
+    )
+    db.add(stock_history)
+    
+    db.delete(db_sale)
+    db.commit()
+    return {"message": "Sale deleted and stock restored successfully"}
 
 
 @app.get("/api/sales", response_model=List[SaleResponse])
