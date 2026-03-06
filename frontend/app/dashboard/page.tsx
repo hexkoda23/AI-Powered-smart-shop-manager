@@ -84,6 +84,12 @@ export default function DashboardPage() {
                             >
                                 RE-AUTHENTICATE
                             </button>
+                            <button
+                                onClick={() => router.push('/register')}
+                                className="btn btn-outline px-8 border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-dim)]"
+                            >
+                                INITIALIZE_NEW_SHOP
+                            </button>
                         </div>
                     </div>
                 </div>

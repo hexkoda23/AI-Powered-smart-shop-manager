@@ -1,5 +1,6 @@
 const isBrowser = typeof window !== 'undefined';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+if (isBrowser) console.log('📡 [Notable API] Target:', API_BASE);
 
 function getShopId(): string | null {
   if (!isBrowser) return null;
