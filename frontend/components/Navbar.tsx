@@ -213,10 +213,10 @@ export default function Navbar() {
                       {roleState && (
                         <button
                           onClick={handleLogout}
-                          className="p-2.5 rounded-xl bg-[var(--bg-2)] border border-[var(--border)] text-[var(--text-3)] hover:text-[var(--danger)] hover:border-[var(--danger)]/20 transition-all"
-                          title="Logout"
+                          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold text-[var(--text-3)] hover:text-[var(--danger)] hover:border-[var(--danger)]/20 transition-all"
                         >
-                          <LockIcon size={18} />
+                          <LockIcon size={16} />
+                          <span>LOGOUT</span>
                         </button>
                       )}
                     </div>
