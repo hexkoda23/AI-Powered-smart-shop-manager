@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from passlib.context import CryptContext
 
@@ -338,7 +338,7 @@ def get_customer_debt_records(customer_id: int, x_shop_id: int = Header(...), db
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
 def get_dashboard_stats(x_shop_id: int = Header(...), db: Session = Depends(get_db)):
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)

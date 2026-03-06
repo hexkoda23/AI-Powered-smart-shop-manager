@@ -15,6 +15,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [activeStore, setActiveStore] = useState('Default');
     const [role, setRole] = useState<Role>(null);
 
@@ -32,10 +33,12 @@ export default function DashboardPage() {
 
     const loadStats = async () => {
         try {
+            setErrorMsg(null);
             const data = await dashboardApi.getStats();
             setStats(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load stats:', error);
+            setErrorMsg(error?.response?.data?.detail || 'CONNECTION_FAILED');
         } finally {
             setLoading(false);
         }
@@ -67,9 +70,14 @@ export default function DashboardPage() {
                             <AlertTriangle size={40} color="var(--danger)" />
                         </div>
                         <h2 style={{ color: 'var(--white)', fontSize: '1.75rem', marginBottom: '0.5rem' }}>DASHBOARD_SYNC_FAILURE</h2>
-                        <p style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginBottom: '2rem' }}>
+                        <p style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginBottom: '1rem' }}>
                             We encountered a problem establishing a secure connection to your shop database. This may be due to an expired session or temporary system maintenance.
                         </p>
+                        {errorMsg && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-[0.7rem] font-mono mb-6 break-all">
+                                ERROR_LOG: {errorMsg}
+                            </div>
+                        )}
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button
                                 onClick={() => { setLoading(true); loadStats(); }}
