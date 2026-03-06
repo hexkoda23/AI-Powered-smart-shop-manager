@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
@@ -17,13 +18,23 @@ from app.schemas import (
 )
 from app.ai_service import AIService
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables on startup
+    try:
+        print("Initializing database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("Database tables initialized successfully.")
+    except Exception as e:
+        print(f"ERROR: Failed to initialize database: {e}")
+        # We don't raise here so the app can still start and show status
+    yield
 
 app = FastAPI(
     title="Notable AI Shop Assistant",
     description="Smart multi-shop assistant for managing sales, stock, and business insights",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # Password Hashing
