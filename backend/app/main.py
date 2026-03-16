@@ -18,6 +18,7 @@ from app.schemas import (
     ShopProfileCreate, ShopProfileResponse
 )
 from app.ai_service import AIService
+import migrate_v5 as migrate
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,8 +27,13 @@ async def lifespan(app: FastAPI):
         print("Initializing database tables...")
         Base.metadata.create_all(bind=engine)
         print("Database tables initialized successfully.")
+        
+        # Run migrations for existing tables
+        print("Running database migrations...")
+        migrate.run_migration()
+        print("Database migrations applied.")
     except Exception as e:
-        print(f"ERROR: Failed to initialize database: {e}")
+        print(f"ERROR: Failed to initialize/migrate database: {e}")
         # We don't raise here so the app can still start and show status
     yield
 
