@@ -25,7 +25,7 @@ export default function StockPage() {
   const [formData, setFormData] = useState({
     name: '',
     current_stock: 0,
-    low_stock_threshold: 10,
+    low_stock_threshold: 2,
     selling_price: 0,
     cost_price: 0,
   });
@@ -68,7 +68,7 @@ export default function StockPage() {
     } else if (type === 'restock' && item) {
       setRestockQty(0);
     } else {
-      setFormData({ name: '', current_stock: 0, low_stock_threshold: 10, selling_price: 0, cost_price: 0 });
+      setFormData({ name: '', current_stock: 0, low_stock_threshold: 2, selling_price: 0, cost_price: 0 });
     }
     setShowModal(true);
   };
@@ -371,7 +371,6 @@ export default function StockPage() {
                       className="input w-full"
                       required
                       placeholder="e.g. Indomie Onion Chicken"
-                      disabled={modalType === 'edit'}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -386,7 +385,7 @@ export default function StockPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>ALERT_FLOOR</label>
+                      <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>REMINDER</label>
                       <input
                         type="number"
                         value={formData.low_stock_threshold}

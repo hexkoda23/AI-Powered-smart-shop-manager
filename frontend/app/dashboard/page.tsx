@@ -3,17 +3,18 @@
 import { useEffect, useState } from 'react';
 import Navbar from '../../components/Navbar';
 import StatCard from '../../components/StatCard';
-import { DashboardStats } from '../../lib/api';
+import { DashboardStats, salesApi, Sale } from '../../lib/api';
 import { dashboardApi } from '../../lib/api';
-import { getShopContext, getRole, Role, isOwnerSessionValid } from '../../lib/auth';
+import { getShopContext, getRole, Role, isOwnerSessionValid, getWorkerProfile } from '../../lib/auth';
 import { useRouter } from 'next/navigation';
-import { DollarSign, TrendingUp, Package, AlertTriangle, Calendar, ShoppingCart, Info, UserCheck, User as UserIcon, RefreshCcw } from 'lucide-react';
+import { DollarSign, TrendingUp, Package, AlertTriangle, Calendar, ShoppingCart, Info, UserCheck, User as UserIcon, RefreshCcw, History } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { cn } from '../../lib/utils';
+import { cn, formatCurrency } from '../../lib/utils';
 
 export default function DashboardPage() {
     const router = useRouter();
     const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [recentSales, setRecentSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [activeStore, setActiveStore] = useState('Default');
@@ -34,8 +35,12 @@ export default function DashboardPage() {
     const loadStats = async () => {
         try {
             setErrorMsg(null);
-            const data = await dashboardApi.getStats();
-            setStats(data);
+            const [statsData, salesData] = await Promise.all([
+                dashboardApi.getStats(),
+                salesApi.getAll({ limit: 10 })
+            ]);
+            setStats(statsData);
+            setRecentSales(salesData);
         } catch (error: any) {
             console.error('Failed to load stats:', error);
             setErrorMsg(error?.response?.data?.detail || 'CONNECTION_FAILED');
@@ -138,7 +143,7 @@ export default function DashboardPage() {
                             )}>
                                 {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
                                 <span className="font-display font-bold tracking-widest text-xs uppercase">
-                                    {role === 'owner' ? 'Owner' : 'Worker'} Page
+                                    {role === 'owner' ? 'Owner' : (getWorkerProfile() || 'Worker')}
                                 </span>
                             </div>
                         )}
@@ -316,6 +321,68 @@ export default function DashboardPage() {
                                     </p>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Staff Activity Ledger - OWNER ONLY */}
+                {role === 'owner' && (
+                    <div className="card mt-10">
+                        <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-3">
+                                <History size={20} color="var(--accent)" />
+                                <h3 style={{ fontSize: '1.25rem' }}>Staff Performance & Activity Ledger</h3>
+                            </div>
+                            <span className="badge badge-accent">Audit Ready</span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>PRODUCT</th>
+                                        <th className="text-center">QTY</th>
+                                        <th className="text-right">TOTAL_VAL</th>
+                                        <th className="text-center">RECORDED_BY</th>
+                                        <th className="text-right">TIMESTAMP</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentSales.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="text-center py-10 opacity-50">
+                                                NO_RECENT_STAFF_ACTIVITY_FOUND
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        recentSales.map((sale) => (
+                                            <tr key={sale.id}>
+                                                <td>
+                                                    <span style={{ fontWeight: 700 }}>{sale.item_name}</span>
+                                                </td>
+                                                <td className="text-center">
+                                                    <span className="mono">{sale.quantity}</span>
+                                                </td>
+                                                <td className="text-right">
+                                                    <span className="mono" style={{ color: 'var(--accent)', fontWeight: 700 }}>
+                                                        {formatCurrency(sale.quantity * sale.selling_price)}
+                                                    </span>
+                                                </td>
+                                                <td className="text-center">
+                                                    <span className="badge badge-info text-[9px] py-0.5">
+                                                        {sale.recorded_by || 'ADMIN'}
+                                                    </span>
+                                                </td>
+                                                <td className="text-right">
+                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                                                        {new Date(sale.sale_date).toLocaleString()}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}

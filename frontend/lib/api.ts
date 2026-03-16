@@ -63,6 +63,7 @@ export interface Sale {
   quantity: number;
   selling_price: number;
   sale_date: string;
+  recorded_by?: string;
   created_at: string;
 }
 
@@ -82,6 +83,20 @@ export interface AIChatResponse {
   response: string;
   insights?: string[];
   recommendations?: string[];
+}
+
+export interface ShopProfile {
+  id: number;
+  shop_id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface ShopProfile {
+  id: number;
+  shop_id: number;
+  name: string;
+  created_at: string;
 }
 
 export interface Customer {
@@ -144,6 +159,18 @@ export const authApi = {
   }
 };
 
+export const profilesApi = {
+  getAll: async (): Promise<ShopProfile[]> => {
+    return request<ShopProfile[]>('/api/profiles');
+  },
+  create: async (name: string): Promise<ShopProfile> => {
+    return request<ShopProfile>('/api/profiles', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+};
+
 export const itemsApi = {
   getAll: async (): Promise<Item[]> => {
     return request<Item[]>('/api/items');
@@ -179,7 +206,7 @@ export const salesApi = {
     if (params?.limit) query.append('limit', params.limit.toString());
     return request<Sale[]>(`/api/sales?${query.toString()}`);
   },
-  create: async (sale: { item_name: string; quantity: number; selling_price: number; sale_date?: string }): Promise<Sale> => {
+  create: async (sale: { item_name: string; quantity: number; selling_price: number; sale_date?: string; recorded_by?: string }): Promise<Sale> => {
     const shopId = getShopId();
     return request<Sale>('/api/sales', {
       method: 'POST',
@@ -208,6 +235,11 @@ export const customersApi = {
     return request<Customer>('/api/customers', {
       method: 'POST',
       body: JSON.stringify({ ...customer, shop_id: shopId ? parseInt(shopId) : 0 }),
+    });
+  },
+  delete: async (id: number): Promise<void> => {
+    return request<void>(`/api/customers/${id}`, {
+      method: 'DELETE',
     });
   },
 };

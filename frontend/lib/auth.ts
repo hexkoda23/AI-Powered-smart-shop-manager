@@ -5,6 +5,7 @@ const ROLE_KEY = 'role'
 const SHOP_ID_KEY = 'notable_shop_id'
 const SHOP_NAME_KEY = 'notable_shop_name'
 const OWNER_SESSION_KEY = 'owner_session_active'
+const WORKER_PROFILE_KEY = 'notable_worker_profile'
 
 export function setShopContext(id: number, name: string) {
   if (!isBrowser) return
@@ -20,12 +21,33 @@ export function getShopContext() {
   }
 }
 
+export function getShopName(): string | null {
+  if (!isBrowser) return null
+  return window.localStorage.getItem(SHOP_NAME_KEY)
+}
+
 export function clearAuth() {
   if (!isBrowser) return
   window.localStorage.removeItem(SHOP_ID_KEY)
   window.localStorage.removeItem(SHOP_NAME_KEY)
   window.localStorage.removeItem(ROLE_KEY)
+  window.localStorage.removeItem(WORKER_PROFILE_KEY)
   window.sessionStorage.removeItem(OWNER_SESSION_KEY)
+}
+
+export function setWorkerProfile(name: string) {
+  if (!isBrowser) return
+  window.localStorage.setItem(WORKER_PROFILE_KEY, name)
+}
+
+export function getWorkerProfile(): string | null {
+  if (!isBrowser) return null
+  return window.localStorage.getItem(WORKER_PROFILE_KEY)
+}
+
+export function clearWorkerProfile() {
+  if (!isBrowser) return
+  window.localStorage.removeItem(WORKER_PROFILE_KEY)
 }
 
 export function setOwnerSession(active: boolean) {

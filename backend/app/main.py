@@ -8,13 +8,14 @@ from typing import List, Optional
 from passlib.context import CryptContext
 
 from app.database import get_db, engine, Base
-from app.models import Item, Sale, StockHistory, Shop, Customer, DebtRecord
+from app.models import Item, Sale, StockHistory, Shop, Customer, DebtRecord, ShopProfile
 from app.schemas import (
     ItemCreate, ItemUpdate, ItemResponse,
     SaleCreate, SaleResponse, SaleUpdate,
     DashboardStats, AIChatRequest, AIChatResponse,
     ShopCreate, ShopLogin, ShopResponse, ShopUpdate, ShopOwnerPinSetup,
-    CustomerCreate, CustomerResponse, DebtRecordCreate, DebtRecordResponse
+    CustomerCreate, CustomerResponse, DebtRecordCreate, DebtRecordResponse,
+    ShopProfileCreate, ShopProfileResponse
 )
 from app.ai_service import AIService
 
@@ -46,6 +47,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
+        "http://localhost:3001", 
+        "http://127.0.0.1:3001",
+        "http://localhost:3002", 
+        "http://127.0.0.1:3002",
         "https://ai-powered-smart-shop-manager-o9mmsw4g4.vercel.app",
         "https://ai-powered-smart-shop-manager.vercel.app"
     ],
@@ -153,6 +158,26 @@ def update_shop_settings(shop_update: ShopUpdate, x_shop_id: int = Header(...), 
     }
 
 
+# --- Profile Endpoints ---
+
+@app.post("/api/profiles", response_model=ShopProfileResponse)
+def create_profile(profile: ShopProfileCreate, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    # Check if a profile with the same name exists
+    existing = db.query(ShopProfile).filter(ShopProfile.name == profile.name, ShopProfile.shop_id == x_shop_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Profile name already exists")
+    
+    db_profile = ShopProfile(name=profile.name, shop_id=x_shop_id)
+    db.add(db_profile)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+@app.get("/api/profiles", response_model=List[ShopProfileResponse])
+def get_profiles(x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    return db.query(ShopProfile).filter(ShopProfile.shop_id == x_shop_id).all()
+
+
 # --- Items Endpoints ---
 
 @app.post("/api/items", response_model=ItemResponse)
@@ -204,6 +229,9 @@ def delete_item(item_id: int, x_shop_id: int = Header(...), db: Session = Depend
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
+    db.query(Sale).filter(Sale.item_id == item.id).delete()
+    db.query(StockHistory).filter(StockHistory.item_id == item.id).delete()
+    
     db.delete(item)
     db.commit()
     return {"message": "Item deleted successfully"}
@@ -225,7 +253,8 @@ def create_sale(sale: SaleCreate, x_shop_id: int = Header(...), db: Session = De
         shop_id=x_shop_id,
         quantity=sale.quantity,
         selling_price=sale.selling_price,
-        sale_date=sale_date
+        sale_date=sale_date,
+        recorded_by=sale.recorded_by
     )
     db.add(db_sale)
     
@@ -251,6 +280,7 @@ def create_sale(sale: SaleCreate, x_shop_id: int = Header(...), db: Session = De
         "quantity": db_sale.quantity,
         "selling_price": db_sale.selling_price,
         "sale_date": db_sale.sale_date,
+        "recorded_by": db_sale.recorded_by,
         "created_at": db_sale.created_at
     }
 
@@ -295,6 +325,7 @@ def update_sale(sale_id: int, sale_update: SaleUpdate, x_shop_id: int = Header(.
         "quantity": db_sale.quantity,
         "selling_price": db_sale.selling_price,
         "sale_date": db_sale.sale_date,
+        "recorded_by": db_sale.recorded_by,
         "created_at": db_sale.created_at
     }
 
@@ -351,6 +382,7 @@ def get_sales(
             "quantity": sale.quantity,
             "selling_price": sale.selling_price,
             "sale_date": sale.sale_date,
+            "recorded_by": sale.recorded_by,
             "created_at": sale.created_at
         })
     
@@ -367,6 +399,17 @@ def create_customer(customer: CustomerCreate, x_shop_id: int = Header(...), db: 
     db.commit()
     db.refresh(db_customer)
     return db_customer
+
+@app.delete("/api/customers/{customer_id}")
+def delete_customer(customer_id: int, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    customer = db.query(Customer).filter(Customer.id == customer_id, Customer.shop_id == x_shop_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    db.query(DebtRecord).filter(DebtRecord.customer_id == customer_id).delete()
+    db.delete(customer)
+    db.commit()
+    return {"message": "Customer deleted successfully"}
 
 
 @app.get("/api/customers", response_model=List[CustomerResponse])
@@ -407,21 +450,25 @@ def get_customer_debt_records(customer_id: int, x_shop_id: int = Header(...), db
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
 def get_dashboard_stats(x_shop_id: int = Header(...), db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+    now = datetime.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)
     
+    def is_after(dt_val, target_val):
+        if not dt_val: return False
+        return dt_val.replace(tzinfo=None) >= target_val
+    
     try:
         shop_sales = db.query(Sale).filter(Sale.shop_id == x_shop_id).join(Item).all()
         
-        daily_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= today_start)
-        weekly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= week_start)
-        monthly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if s.sale_date >= month_start)
+        daily_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if is_after(s.sale_date, today_start))
+        weekly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if is_after(s.sale_date, week_start))
+        monthly_profit = sum((s.selling_price - s.item.cost_price) * s.quantity for s in shop_sales if is_after(s.sale_date, month_start))
         
-        total_sales_today = sum(s.quantity for s in shop_sales if s.sale_date >= today_start)
-        total_sales_week = sum(s.quantity for s in shop_sales if s.sale_date >= week_start)
-        total_sales_month = sum(s.quantity for s in shop_sales if s.sale_date >= month_start)
+        total_sales_today = sum(s.quantity for s in shop_sales if is_after(s.sale_date, today_start))
+        total_sales_week = sum(s.quantity for s in shop_sales if is_after(s.sale_date, week_start))
+        total_sales_month = sum(s.quantity for s in shop_sales if is_after(s.sale_date, month_start))
         
         low_stock_items = db.query(Item).filter(Item.shop_id == x_shop_id, Item.current_stock <= Item.low_stock_threshold).all()
         

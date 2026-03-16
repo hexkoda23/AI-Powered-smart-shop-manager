@@ -27,10 +27,21 @@ class ShopResponse(ShopBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ShopProfileCreate(BaseModel):
+    name: str
+
+class ShopProfileResponse(BaseModel):
+    id: int
+    shop_id: int
+    name: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ItemBase(BaseModel):
     name: str
     current_stock: int = 0
-    low_stock_threshold: int = 10
+    low_stock_threshold: int = 2
     selling_price: float = 0.0
     cost_price: float = 0.0
 
@@ -58,6 +69,7 @@ class SaleCreate(BaseModel):
     quantity: int = Field(gt=0)
     selling_price: float = Field(gt=0)
     sale_date: Optional[datetime] = None
+    recorded_by: Optional[str] = None
 
 class SaleUpdate(BaseModel):
     quantity: int = Field(gt=0)
@@ -71,6 +83,7 @@ class SaleResponse(BaseModel):
     quantity: int
     selling_price: float
     sale_date: datetime
+    recorded_by: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

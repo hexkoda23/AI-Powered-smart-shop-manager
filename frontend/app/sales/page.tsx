@@ -5,7 +5,7 @@ import Navbar from '../../components/Navbar';
 import { salesApi, itemsApi, aiApi, customersApi, debtApi, Item, Sale, Suggestion, Customer } from '../../lib/api';
 import { ShoppingBag, ArrowRight, History, AlertCircle, CheckCircle2, Zap, Sparkles, X, User, CreditCard, Edit2, Trash2 } from 'lucide-react';
 import { formatCurrency, formatDateTime, cn } from '../../lib/utils';
-import { getRole, Role } from '../../lib/auth';
+import { getRole, Role, getWorkerProfile } from '../../lib/auth';
 import { UserCheck, User as UserIcon } from 'lucide-react';
 
 export default function SalesPage() {
@@ -116,6 +116,19 @@ export default function SalesPage() {
         return;
       }
 
+      const item = items.find(i => i.name === formData.item_name);
+      if (!item) {
+        setError('PLEASE_SELECT_A_VALID_ITEM');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.quantity > item.current_stock) {
+        setError(`INSUFFICIENT_STOCK: Only ${item.current_stock} units available.`);
+        setLoading(false);
+        return;
+      }
+
       if (editingSaleId) {
         await salesApi.update(editingSaleId, {
           quantity: formData.quantity,
@@ -131,7 +144,10 @@ export default function SalesPage() {
           return;
         }
 
-        await salesApi.create(formData);
+        await salesApi.create({
+          ...formData,
+          recorded_by: getWorkerProfile() || undefined
+        });
 
         if (payLater) {
           let finalCustomerId = selectedCustomerId;
@@ -447,6 +463,7 @@ export default function SalesPage() {
                     <tr>
                       <th>PRODUCT_IDENTITY</th>
                       <th className="text-center">QTY</th>
+                      <th className="text-center">WORKER</th>
                       <th className="text-right">UNIT_VAL</th>
                       <th className="text-right">EXTENDED_VAL</th>
                       <th className="text-right">TIMESTAMP</th>
@@ -461,6 +478,9 @@ export default function SalesPage() {
                         </td>
                         <td className="text-center">
                           <span className="mono">{sale.quantity}</span>
+                        </td>
+                        <td className="text-center">
+                          <span className="badge badge-info text-[9px] py-0.5">{sale.recorded_by || 'ADMIN'}</span>
                         </td>
                         <td className="text-right">
                           <span className="mono">{formatCurrency(sale.selling_price)}</span>

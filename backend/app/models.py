@@ -15,6 +15,17 @@ class Shop(Base):
 
     items = relationship("Item", back_populates="shop")
     customers = relationship("Customer", back_populates="shop")
+    profiles = relationship("ShopProfile", back_populates="shop")
+
+class ShopProfile(Base):
+    __tablename__ = "shop_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    shop = relationship("Shop", back_populates="profiles")
 
 
 class Item(Base):
@@ -24,7 +35,7 @@ class Item(Base):
     shop_id = Column(Integer, ForeignKey("shops.id"), nullable=False)
     name = Column(String, index=True, nullable=False) # Name is unique per shop now
     current_stock = Column(Integer, default=0)
-    low_stock_threshold = Column(Integer, default=10)
+    low_stock_threshold = Column(Integer, default=2)
     selling_price = Column(Float, default=0.0)
     cost_price = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -43,6 +54,7 @@ class Sale(Base):
     quantity = Column(Integer, nullable=False)
     selling_price = Column(Float, nullable=False)
     sale_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    recorded_by = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     item = relationship("Item", back_populates="sales")

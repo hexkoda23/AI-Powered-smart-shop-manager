@@ -39,7 +39,7 @@ export default function LoginPage() {
             window.localStorage.setItem('notable_is_pin_set', shop.is_pin_set.toString());
             setRole('worker'); // Standard login enters as worker
             setOwnerSession(false);
-            router.push('/dashboard');
+            router.push('/profiles');
         } catch (err: any) {
             setError(err.response?.data?.detail || 'INVALID_CREDENTIALS');
             setLoading(false);

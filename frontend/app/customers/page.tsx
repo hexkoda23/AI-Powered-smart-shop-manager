@@ -17,8 +17,9 @@ export default function CustomersPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
-    const [modalType, setModalType] = useState<'add' | 'payment'>('add');
+    const [modalType, setModalType] = useState<'add' | 'payment' | 'history' | 'debt'>('add');
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [debtRecords, setDebtRecords] = useState<DebtRecord[]>([]);
     const [amount, setAmount] = useState(0);
     const [notes, setNotes] = useState('');
     const [role, setRole] = useState<Role>(null);
@@ -26,8 +27,7 @@ export default function CustomersPage() {
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
-        address: '',
-        credit_limit: 50000
+        address: ''
     });
 
     useEffect(() => {
@@ -57,23 +57,65 @@ export default function CustomersPage() {
         try {
             if (modalType === 'add') {
                 await customersApi.create(formData);
+                setShowModal(false);
+                resetForms();
+                loadCustomers();
             } else if (modalType === 'payment' && selectedCustomer) {
                 await debtApi.logPayment(selectedCustomer.id, amount, notes);
+
+                // Reload customer and debt records right after logging payment
+                await loadCustomers();
+                const newRecords = await debtApi.getRecords(selectedCustomer.id);
+                setDebtRecords(newRecords);
+
+                // Find updated customer to update selectedCustomer state
+                const data = await customersApi.getAll();
+                const updatedCustomer = data.find(c => c.id === selectedCustomer.id);
+                if (updatedCustomer) setSelectedCustomer(updatedCustomer);
+
+                setAmount(0);
+                setNotes('');
+                // Keep the modal open to show updated info, optionally switch to history view
+                setModalType('history');
+            } else if (modalType === 'debt' && selectedCustomer) {
+                await debtApi.logDebt(selectedCustomer.id, amount, notes);
+
+                // Reload customer and debt records
+                await loadCustomers();
+                const newRecords = await debtApi.getRecords(selectedCustomer.id);
+                setDebtRecords(newRecords);
+
+                const data = await customersApi.getAll();
+                const updatedCustomer = data.find(c => c.id === selectedCustomer.id);
+                if (updatedCustomer) setSelectedCustomer(updatedCustomer);
+
+                setAmount(0);
+                setNotes('');
+                setModalType('history');
             }
-            setShowModal(false);
-            resetForms();
-            loadCustomers();
         } catch (error) {
             console.error('Operation failed:', error);
         }
     };
 
     const resetForms = () => {
-        setFormData({ name: '', phone: '', address: '', credit_limit: 50000 });
+        setFormData({ name: '', phone: '', address: '' });
         setAmount(0);
         setNotes('');
         setSelectedCustomer(null);
     };
+
+    const handleViewHistory = async (customer: Customer) => {
+        setSelectedCustomer(customer);
+        setModalType('history');
+        setShowModal(true);
+        try {
+            const records = await debtApi.getRecords(customer.id);
+            setDebtRecords(records);
+        } catch (error) {
+            console.error('Failed to load debt history', error);
+        }
+    }
 
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,7 +196,6 @@ export default function CustomersPage() {
                                 <tr>
                                     <th>CUSTOMER_IDENTITY</th>
                                     <th>CONTACT_INFO</th>
-                                    <th className="text-right">CREDIT_LIMIT</th>
                                     <th className="text-right">OUTSTANDING</th>
                                     <th className="text-right">RISK</th>
                                     <th className="text-right">MGMT</th>
@@ -184,7 +225,6 @@ export default function CustomersPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="text-right mono">{formatCurrency(customer.credit_limit)}</td>
                                             <td className="text-right mono font-bold" style={{ color: customer.total_debt > 0 ? 'var(--danger)' : 'inherit' }}>
                                                 {formatCurrency(customer.total_debt)}
                                             </td>
@@ -196,11 +236,39 @@ export default function CustomersPage() {
                                             <td className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
-                                                        onClick={() => { setSelectedCustomer(customer); setModalType('payment'); setShowModal(true); }}
+                                                        onClick={() => handleViewHistory(customer)}
                                                         className="btn btn-outline p-1.5"
+                                                        title="View History"
+                                                    >
+                                                        <History size={14} color="var(--text-2)" />
+                                                    </button>
+                                                    <button
                                                         title="Log Payment"
                                                     >
                                                         <DollarSign size={14} color="var(--accent)" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setSelectedCustomer(customer); setModalType('debt'); setShowModal(true); }}
+                                                        className="btn btn-outline p-1.5"
+                                                        title="Increase Debt"
+                                                    >
+                                                        <Plus size={14} color="var(--danger)" />
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (confirm('Are you sure you want to delete this customer? All their debt records will be lost.')) {
+                                                                try {
+                                                                    await customersApi.delete(customer.id);
+                                                                    loadCustomers();
+                                                                } catch (error) {
+                                                                    console.error('Failed to delete customer', error);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="btn btn-outline p-1.5 hover:bg-red-950/30"
+                                                        title="Delete Customer"
+                                                    >
+                                                        <X size={14} color="var(--danger)" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -222,87 +290,150 @@ export default function CustomersPage() {
                         </button>
 
                         <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>
-                            {modalType === 'add' ? 'Register New Customer' : `Log Payment: ${selectedCustomer?.name}`}
+                            {modalType === 'add' ? 'Register New Customer'
+                                : modalType === 'payment' ? `Log Payment: ${selectedCustomer?.name}`
+                                    : modalType === 'debt' ? `Increase Debt: ${selectedCustomer?.name}`
+                                        : `Debt History: ${selectedCustomer?.name}`}
                         </h3>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            {modalType === 'add' ? (
-                                <>
-                                    <div className="space-y-2">
-                                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>FULL_NAME</label>
-                                        <input
-                                            type="text"
-                                            className="input w-full"
-                                            required
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                        {modalType === 'history' ? (
+                            <div className="space-y-6">
+                                <div className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] flex justify-between items-center">
+                                    <span style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>Current Balance:</span>
+                                    <span style={{ fontSize: '1.5rem', fontWeight: 800, color: selectedCustomer?.total_debt && selectedCustomer.total_debt > 0 ? 'var(--danger)' : 'var(--text)' }}>
+                                        {formatCurrency(selectedCustomer?.total_debt || 0)}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between items-center mt-4">
+                                    <h4 style={{ fontSize: '1rem', fontWeight: 600 }}>Payment Records</h4>
+                                    <button
+                                        onClick={() => setModalType('payment')}
+                                        className="btn btn-outline py-1 px-3"
+                                        style={{ fontSize: '0.8rem' }}
+                                    >
+                                        Log New Payment
+                                    </button>
+                                    <button
+                                        onClick={() => setModalType('debt')}
+                                        className="btn btn-outline py-1 px-3 border-[var(--danger)] text-[var(--danger)]"
+                                        style={{ fontSize: '0.8rem' }}
+                                    >
+                                        Increase Debt
+                                    </button>
+                                </div>
+
+                                <div className="max-h-[300px] overflow-y-auto pr-2 space-y-3 mt-4 custom-scrollbar">
+                                    {debtRecords.length === 0 ? (
+                                        <div className="text-center p-6 opacity-50 border border-dashed rounded-lg">
+                                            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>NO_PAYMENT_HISTORY</p>
+                                        </div>
+                                    ) : (
+                                        debtRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => (
+                                            <div key={record.id} className="p-3 rounded-lg border border-[var(--border-2)] bg-[var(--bg)] flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className={cn("font-bold", record.type === 'debt' ? 'text-[var(--danger)]' : 'text-[var(--accent)]')}>
+                                                        {record.type === 'debt' ? 'Added Debt' : 'Part Payment'}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>{formatDateTime(record.date)}</span>
+                                                    {record.notes && <span style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginTop: '0.25rem' }}>"{record.notes}"</span>}
+                                                </div>
+                                                <span className={cn("font-mono font-bold text-lg", record.type === 'debt' ? 'text-[var(--danger)]' : 'text-[var(--accent)]')}>
+                                                    {record.type === 'debt' ? '+' : '-'}{formatCurrency(record.amount)}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline w-full py-3 mt-4">
+                                    Close
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {modalType === 'add' ? (
+                                    <>
                                         <div className="space-y-2">
-                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>PHONE_NUMBER</label>
+                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>FULL_NAME</label>
                                             <input
                                                 type="text"
                                                 className="input w-full"
                                                 required
-                                                value={formData.phone}
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>PHONE_NUMBER</label>
+                                                <input
+                                                    type="text"
+                                                    className="input w-full"
+                                                    required
+                                                    value={formData.phone}
+                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>ADDRESS</label>
+                                            <textarea
+                                                className="input w-full min-h-[80px] py-3"
+                                                required
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex flex-wrap items-center justify-between mb-4">
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setModalType('history')}
+                                                    className="btn btn-outline py-1 px-3 flex items-center gap-1"
+                                                    style={{ fontSize: '0.8rem' }}
+                                                >
+                                                    &larr; Back to History
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)]">
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.5rem' }}>CURRENT_DEBT</p>
+                                            <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(selectedCustomer?.total_debt || 0)}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>{modalType === 'payment' ? 'PAYMENT_AMOUNT' : 'DEBT_INCREASE_AMOUNT'}</label>
+                                            <input
+                                                type="number"
+                                                className={cn("input w-full text-center text-2xl h-16", modalType === 'debt' && "border-[var(--danger)] text-[var(--danger)]")}
+                                                required autoFocus
+                                                value={amount}
+                                                onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>CREDIT_LIMIT</label>
+                                            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>NOTES</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 className="input w-full"
-                                                required
-                                                value={formData.credit_limit}
-                                                onChange={(e) => setFormData({ ...formData, credit_limit: parseInt(e.target.value) || 0 })}
+                                                placeholder="e.g. Paid via Transfer"
+                                                value={notes}
+                                                onChange={(e) => setNotes(e.target.value)}
                                             />
                                         </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>ADDRESS</label>
-                                        <textarea
-                                            className="input w-full min-h-[80px] py-3"
-                                            required
-                                            value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)]">
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.5rem' }}>CURRENT_DEBT</p>
-                                        <p style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(selectedCustomer?.total_debt || 0)}</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>PAYMENT_AMOUNT</label>
-                                        <input
-                                            type="number"
-                                            className="input w-full text-center text-2xl h-16"
-                                            required autoFocus
-                                            value={amount}
-                                            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>NOTES</label>
-                                        <input
-                                            type="text"
-                                            className="input w-full"
-                                            placeholder="e.g. Paid via Transfer"
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                                    </>
+                                )}
 
-                            <button type="submit" className="btn btn-primary w-full py-4 uppercase">
-                                {modalType === 'add' ? 'Register Customer' : 'Confirm Payment'}
-                            </button>
-                        </form>
+                                <button type="submit" className={cn("btn w-full py-4 uppercase", modalType === 'debt' ? 'btn-outline border-[var(--danger)] text-[var(--danger)]' : 'btn-primary')}>
+                                    {modalType === 'add' ? 'Register Customer' : modalType === 'payment' ? 'Confirm Payment' : 'Increase Indebtedness'}
+                                </button>
+
+                            </form>
+                        )}
                     </div>
                 </div>
             )}

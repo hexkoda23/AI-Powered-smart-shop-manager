@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getShopContext, setShopContext, isOwner, getRole, Role } from '../../lib/auth';
-import { authApi } from '../../lib/api';
-import { Store, Key, Save, ArrowLeft, ShieldCheck, AlertCircle, Lock, Eye, EyeOff, ShieldAlert, UserCheck } from 'lucide-react';
+import { authApi, profilesApi, ShopProfile } from '../../lib/api';
+import { Store, Key, Save, ArrowLeft, ShieldCheck, AlertCircle, Lock, Eye, EyeOff, ShieldAlert, UserCheck, Users, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import Link from 'next/link';
 
@@ -23,6 +23,7 @@ export default function SettingsPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [role, setRole] = useState<Role>(null);
+    const [profiles, setProfiles] = useState<ShopProfile[]>([]);
 
     useEffect(() => {
         if (!isOwner()) {
@@ -32,7 +33,17 @@ export default function SettingsPage() {
         const context = getShopContext();
         if (context.name) setShopName(context.name);
         setRole(getRole());
+        loadProfiles();
     }, [router]);
+
+    const loadProfiles = async () => {
+        try {
+            const data = await profilesApi.getAll();
+            setProfiles(data);
+        } catch (err) {
+            console.error('Failed to load profiles', err);
+        }
+    };
 
     const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -165,6 +176,33 @@ export default function SettingsPage() {
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 px-6 focus:outline-none focus:ring-2 focus:ring-[var(--info)]/50 focus:border-[var(--info)] transition-all text-white"
                                     />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Profile Management Section */}
+                        <div className="space-y-6">
+                            <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-[var(--gold)] flex items-center gap-2">
+                                <Users size={16} /> Worker_Registry_Kernel
+                            </h2>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {profiles.map((p) => (
+                                        <div key={p.id} className="p-4 rounded-2xl bg-[var(--bg-3)] border border-[var(--border)] flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-[var(--gold)]/10 flex items-center justify-center text-[var(--gold)] font-bold text-xs">
+                                                    {p.name.charAt(0)}
+                                                </div>
+                                                <span className="text-sm font-medium">{p.name}</span>
+                                            </div>
+                                            <span className="text-[9px] font-mono text-[var(--text-3)]">{new Date(p.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                    ))}
+                                    {profiles.length === 0 && (
+                                        <div className="md:col-span-2 py-8 text-center border-2 border-dashed border-[var(--border)] rounded-3xl opacity-50">
+                                            <p className="text-xs font-mono">NO_PROFILES_REGISTERED</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

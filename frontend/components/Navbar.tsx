@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ShoppingBag, BarChart3, Package, MessageSquare, Shield, User, Store, Lock as LockIcon, X, CheckCircle2, ShieldCheck, Key, Menu } from 'lucide-react';
+import { ShoppingBag, BarChart3, Package, MessageSquare, Shield, User, Store, Lock as LockIcon, X, CheckCircle2, ShieldCheck, Key, Menu, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getRole, setOwnerSession, getShopContext, setRole, clearAuth } from '../lib/auth';
+import { getRole, setOwnerSession, getShopContext, setRole, clearAuth, getWorkerProfile } from '../lib/auth';
 import { authApi } from '../lib/api';
 
 const workerNav = [
@@ -170,7 +170,7 @@ export default function Navbar() {
                     "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-widest border",
                     roleState === 'owner' ? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20" : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
                   )}>
-                    {roleState}_MODE
+                    {roleState === 'owner' ? 'OWNER_MODE' : (getWorkerProfile()?.toUpperCase() || 'WORKER') + '_MODE'}
                   </span>
                 </div>
               )}
@@ -198,7 +198,7 @@ export default function Navbar() {
                           className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all"
                         >
                           <User size={16} />
-                          <span>WORKER_VIEW</span>
+                          <span>{getWorkerProfile() || 'WORKER_VIEW'}</span>
                         </button>
                       ) : roleState === 'worker' ? (
                         <button
@@ -209,6 +209,16 @@ export default function Navbar() {
                           <span>OWNER_PAGE</span>
                         </button>
                       ) : null}
+
+                      {roleState === 'worker' && (
+                        <button
+                          onClick={() => router.push('/profiles')}
+                          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all"
+                        >
+                          <Users size={16} />
+                          <span>SWITCH_PROFILE</span>
+                        </button>
+                      )}
 
                       {roleState && (
                         <button
@@ -268,7 +278,7 @@ export default function Navbar() {
                 "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-widest border",
                 roleState === 'owner' ? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20" : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
               )}>
-                {roleState}
+                {roleState === 'owner' ? 'OWNER_MODE' : (getWorkerProfile()?.toUpperCase() || 'WORKER') + '_MODE'}
               </span>
             </div>
 
@@ -282,7 +292,7 @@ export default function Navbar() {
                 className="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all w-full justify-start text-white"
               >
                 <User size={18} />
-                SWITCH TO WORKER VIEW
+                SWITCH TO {getWorkerProfile() || 'WORKER'} VIEW
               </button>
             ) : roleState === 'worker' ? (
               <button
