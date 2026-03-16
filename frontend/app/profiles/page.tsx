@@ -85,7 +85,7 @@ export default function ProfilesPage() {
                 </div>
             </div>
 
-            <h1 className="text-4xl md:text-5xl font-medium mb-12 tracking-wide font-display">Who's working?</h1>
+            <h1 className="text-4xl md:text-5xl font-medium mb-12 tracking-wide font-display">Who&apos;s working?</h1>
 
             <div className="flex flex-wrap justify-center gap-6 max-w-4xl px-4">
                 {profiles.map((profile, i) => (

@@ -336,7 +336,7 @@ export default function CustomersPage() {
                                                         {record.type === 'debt' ? 'Added Debt' : 'Part Payment'}
                                                     </span>
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>{formatDateTime(record.date)}</span>
-                                                    {record.notes && <span style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginTop: '0.25rem' }}>"{record.notes}"</span>}
+                                                    {record.notes && <span style={{ fontSize: '0.8rem', color: 'var(--text-2)', marginTop: '0.25rem' }}>&quot;{record.notes}&quot;</span>}
                                                 </div>
                                                 <span className={cn("font-mono font-bold text-lg", record.type === 'debt' ? 'text-[var(--danger)]' : 'text-[var(--accent)]')}>
                                                     {record.type === 'debt' ? '+' : '-'}{formatCurrency(record.amount)}
