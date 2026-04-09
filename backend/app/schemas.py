@@ -21,7 +21,7 @@ class ShopOwnerPinSetup(BaseModel):
     pin: str = Field(..., min_length=4, max_length=4)
 
 class ShopResponse(ShopBase):
-    id: int
+    id: str
     created_at: datetime
     is_pin_set: bool
     model_config = ConfigDict(from_attributes=True)
@@ -31,8 +31,8 @@ class ShopProfileCreate(BaseModel):
     name: str
 
 class ShopProfileResponse(BaseModel):
-    id: int
-    shop_id: int
+    id: str
+    shop_id: str
     name: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -46,7 +46,7 @@ class ItemBase(BaseModel):
     cost_price: float = 0.0
 
 class ItemCreate(ItemBase):
-    shop_id: int
+    shop_id: str
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -56,15 +56,15 @@ class ItemUpdate(BaseModel):
     cost_price: Optional[float] = None
 
 class ItemResponse(ItemBase):
-    id: int
-    shop_id: int
+    id: str
+    shop_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class SaleCreate(BaseModel):
-    shop_id: int
+    shop_id: str
     item_name: str
     quantity: int = Field(gt=0)
     selling_price: float = Field(gt=0)
@@ -76,9 +76,9 @@ class SaleUpdate(BaseModel):
     selling_price: float = Field(gt=0)
 
 class SaleResponse(BaseModel):
-    id: int
-    shop_id: int
-    item_id: int
+    id: str
+    shop_id: str
+    item_id: str
     item_name: str
     quantity: int
     selling_price: float
@@ -95,7 +95,7 @@ class CustomerBase(BaseModel):
     credit_limit: float = 50000.0
 
 class CustomerCreate(CustomerBase):
-    shop_id: int
+    shop_id: str
 
 class CustomerResponse(CustomerBase):
     id: int
@@ -106,14 +106,14 @@ class CustomerResponse(CustomerBase):
 
 
 class DebtRecordCreate(BaseModel):
-    customer_id: int
+    customer_id: str
     amount: float
     type: str  # 'debt' or 'payment'
     notes: Optional[str] = None
 
 class DebtRecordResponse(BaseModel):
-    id: int
-    customer_id: int
+    id: str
+    customer_id: str
     amount: float
     type: str
     date: datetime
@@ -135,7 +135,7 @@ class DashboardStats(BaseModel):
 
 class AIChatRequest(BaseModel):
     message: str
-    shop_id: int
+    shop_id: str
     context: Optional[dict] = None
 
 class AIChatResponse(BaseModel):

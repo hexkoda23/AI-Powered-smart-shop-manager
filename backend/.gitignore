@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.env
+venv/
+env/
+
+# Firebase credentials - NEVER commit these
+*.json
+!package.json
+!package-lock.json
+
+# Database
+*.db
+*.sqlite
+
+# Render/cloud
+render.yaml
