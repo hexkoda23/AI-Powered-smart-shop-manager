@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from passlib.context import CryptContext
@@ -19,7 +20,6 @@ from app.ai_service import AIService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Firebase usually doesn't need "table creation" like SQL
     print("Firebase Firestore initialized.")
     yield
 
@@ -33,14 +33,28 @@ app = FastAPI(
 # Password Hashing
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# CORS middleware
+# CORS middleware - must be registered first
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Simplified for migration, can be restricted later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global 500 handler — ensures CORS headers are always included in error responses
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
