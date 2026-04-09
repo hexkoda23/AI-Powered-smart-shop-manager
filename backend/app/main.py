@@ -42,9 +42,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {"message": "Notable AI Multi-Shop API (Firebase)"}
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health():
+    return {"status": "ok"}
 
 # --- Auth Endpoints ---
 
