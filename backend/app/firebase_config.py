@@ -18,36 +18,43 @@ def initialize_firebase():
                 project_id = cred_dict.get("project_id")
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-                print(f"Firebase initialized for project: {project_id}")
+                print(f"DEBUG: Firebase Admin SDK initialized for project: {project_id}")
             except Exception as e:
-                print(f"ERROR initializing Firebase from JSON string: {e}")
+                print(f"DEBUG ERROR: Failed to parse or init with JSON: {e}")
                 raise
         elif os.getenv("FIREBASE_SERVICE_ACCOUNT"):
             try:
                 cred = credentials.Certificate(os.getenv("FIREBASE_SERVICE_ACCOUNT"))
                 firebase_admin.initialize_app(cred)
-                print("Firebase initialized from service account file.")
+                print(f"DEBUG: Firebase initialized from file: {os.getenv('FIREBASE_SERVICE_ACCOUNT')}")
             except Exception as e:
-                print(f"ERROR initializing Firebase from file: {e}")
+                print(f"DEBUG ERROR: Failed to init from file: {e}")
                 raise
         else:
-            raise RuntimeError("FIREBASE_CONFIG_JSON or FIREBASE_SERVICE_ACCOUNT not set.")
+            raise RuntimeError("Missing FIREBASE_CONFIG_JSON or FIREBASE_SERVICE_ACCOUNT.")
 
-    # Explicitly return client for (default) database
+    # Try to get project name from the app
+    current_app = firebase_admin.get_app()
+    proj_id = current_app.project_id
+    print(f"DEBUG: Using Project ID: {proj_id}")
+
+    # Explicitly return client
+    # Note: the (default) database ID is usually mapped automatically, but we can be explicit
     client = firestore.client()
     
-    # Simple connectivity test
     try:
-        # Just check if we can list collections (even if empty)
-        collections = client.collections()
-        print("Firestore connectivity verified successfully.")
+        # Check if we can reach the project
+        print(f"DEBUG: Attempting to list collections in project {proj_id}...")
+        colls = list(client.collections())
+        print(f"DEBUG: Success! Found {len(colls)} collections.")
     except Exception as e:
-        print(f"Firestore Connectivity Check Failed: {e}")
-        # We don't raise here to allow the app to show the error via endpoints
+        print(f"DEBUG ERROR: Connection check failed: {e}")
+        # This will likely show the 'database (default) does not exist' error
         
     return client
 
 db = initialize_firebase()
+
 
 
 def get_db():
