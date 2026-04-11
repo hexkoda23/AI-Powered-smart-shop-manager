@@ -38,10 +38,15 @@ def initialize_firebase():
     proj_id = current_app.project_id
     print(f"DEBUG: Using Project ID: {proj_id}")
 
-    # Explicitly return client
-    # Note: the (default) database ID is usually mapped automatically, but we can be explicit
-    client = firestore.client()
-    
+    # FORCE explicit project and database ID
+    # This addresses the "database (default) does not exist" issue by being non-ambiguous
+    try:
+        client = firestore.client(project=proj_id, database="(default)")
+        print(f"DEBUG: Firestore client created for project {proj_id} and database (default)")
+    except Exception as e:
+        print(f"DEBUG ERROR: Failed to create client: {e}")
+        client = firestore.client() # Fallback
+
     try:
         # Check if we can reach the project
         print(f"DEBUG: Attempting to list collections in project {proj_id}...")
@@ -50,6 +55,7 @@ def initialize_firebase():
     except Exception as e:
         print(f"DEBUG ERROR: Connection check failed: {e}")
         # This will likely show the 'database (default) does not exist' error
+
         
     return client
 
