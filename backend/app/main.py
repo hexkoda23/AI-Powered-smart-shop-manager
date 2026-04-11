@@ -58,7 +58,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
-    return {"message": "Notable AI Multi-Shop API (Firebase)"}
+    # Use the client to get the project ID for verification
+    db = get_db()
+    return {
+        "message": "Notable AI Multi-Shop API (Firebase)",
+        "project_id": db.project,
+        "database": db.database
+    }
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
