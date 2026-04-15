@@ -2,12 +2,13 @@ from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from passlib.context import CryptContext
-from google.cloud import firestore
 
-from app.firebase_config import get_db
+from app.database import get_db, engine
+from app.models import Base, Shop, Item, Sale, Customer, DebtRecord, ShopProfile, StockHistory
 from app.schemas import (
     ItemCreate, ItemUpdate, ItemResponse,
     SaleCreate, SaleResponse, SaleUpdate,
@@ -20,20 +21,23 @@ from app.ai_service import AIService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Firebase Firestore initialized.")
+    print("Initializing database tables...")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database tables ready.")
+    except Exception as e:
+        print(f"ERROR: Failed to initialize database: {e}")
     yield
 
 app = FastAPI(
-    title="Notable AI Shop Assistant (Firebase)",
-    description="Smart multi-shop assistant powered by Firebase Firestore",
-    version="3.0.0",
+    title="Notable AI Shop Assistant",
+    description="Smart multi-shop assistant",
+    version="4.0.0",
     lifespan=lifespan
 )
 
-# Password Hashing
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# CORS middleware - must be registered first
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +46,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global 500 handler — ensures CORS headers are always included in error responses
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -58,13 +61,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
-    # Use the client to get the project ID for verification
-    db = get_db()
-    return {
-        "message": "Notable AI Multi-Shop API (Firebase)",
-        "project_id": db.project,
-        "database": db.database
-    }
+    return {"message": "Notable AI Multi-Shop API v4 (Supabase)"}
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
@@ -73,272 +70,301 @@ def health():
 # --- Auth Endpoints ---
 
 @app.post("/api/auth/register", response_model=ShopResponse)
-def register_shop(shop: ShopCreate, db: firestore.Client = Depends(get_db)):
-    shops_ref = db.collection('shops')
-    existing = shops_ref.where('name', '==', shop.name).limit(1).get()
-    if len(existing) > 0:
+def register_shop(shop: ShopCreate, db: Session = Depends(get_db)):
+    existing = db.query(Shop).filter(Shop.name == shop.name).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Store name already registered")
-    
     hashed_password = pwd_context.hash(shop.password)
-    new_shop = {
-        "name": shop.name,
-        "password_hash": hashed_password,
-        "pin_hash": None,
-        "created_at": datetime.now(timezone.utc)
-    }
-    
-    doc_ref = shops_ref.add(new_shop)[1]
-    return {
-        "id": doc_ref.id,
-        "name": shop.name,
-        "created_at": new_shop["created_at"],
-        "is_pin_set": False
-    }
+    new_shop = Shop(name=shop.name, password_hash=hashed_password)
+    db.add(new_shop)
+    db.commit()
+    db.refresh(new_shop)
+    return {**new_shop.__dict__, "is_pin_set": new_shop.pin_hash is not None}
 
 @app.post("/api/auth/login", response_model=ShopResponse)
-def login_shop(login: ShopLogin, db: firestore.Client = Depends(get_db)):
-    shops_ref = db.collection('shops')
-    query = shops_ref.where('name', '==', login.name).limit(1).get()
-    
-    if len(query) == 0:
-        raise HTTPException(status_code=401, detail="Invalid store name or password")
-    
-    doc = query[0]
-    db_shop = doc.to_dict()
-    
-    if not pwd_context.verify(login.password, db_shop["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid store name or password")
-    
-    return {
-        "id": doc.id,
-        "name": db_shop["name"],
-        "created_at": db_shop["created_at"],
-        "is_pin_set": db_shop.get("pin_hash") is not None
-    }
+def login_shop(login: ShopLogin, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.name == login.name).first()
+    if not shop or not pwd_context.verify(login.password, shop.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid name or password")
+    return {**shop.__dict__, "is_pin_set": shop.pin_hash is not None}
 
-@app.post("/api/auth/verify-owner-pin")
-def verify_owner_pin(setup: ShopOwnerPinSetup, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    doc_ref = db.collection('shops').document(x_shop_id)
-    doc = doc_ref.get()
-    if not doc.exists:
+@app.get("/api/auth/shop/{shop_id}", response_model=ShopResponse)
+def get_shop(shop_id: int, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
-    
-    db_shop = doc.to_dict()
-    if not db_shop.get("pin_hash"):
-        raise HTTPException(status_code=401, detail="PIN not set")
-    
-    if not pwd_context.verify(setup.pin, db_shop["pin_hash"]):
+    return {**shop.__dict__, "is_pin_set": shop.pin_hash is not None}
+
+@app.put("/api/auth/shop/{shop_id}", response_model=ShopResponse)
+def update_shop(shop_id: int, update: ShopUpdate, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    if update.name:
+        shop.name = update.name
+    if update.password:
+        shop.password_hash = pwd_context.hash(update.password)
+    if update.owner_pin:
+        shop.pin_hash = pwd_context.hash(update.owner_pin)
+    db.commit()
+    db.refresh(shop)
+    return {**shop.__dict__, "is_pin_set": shop.pin_hash is not None}
+
+@app.post("/api/auth/shop/{shop_id}/set-pin")
+def set_owner_pin(shop_id: int, pin_data: ShopOwnerPinSetup, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    shop.pin_hash = pwd_context.hash(pin_data.pin)
+    db.commit()
+    return {"message": "PIN set successfully"}
+
+@app.post("/api/auth/shop/{shop_id}/verify-pin")
+def verify_pin(shop_id: int, pin_data: ShopOwnerPinSetup, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop or not shop.pin_hash:
+        raise HTTPException(status_code=404, detail="PIN not set")
+    if not pwd_context.verify(pin_data.pin, shop.pin_hash):
         raise HTTPException(status_code=401, detail="Invalid PIN")
-    
-    return {"status": "success"}
+    return {"message": "PIN verified"}
 
-# --- Profile Endpoints ---
+# --- Shop Profiles ---
 
-@app.post("/api/profiles", response_model=ShopProfileResponse)
-def create_profile(profile: ShopProfileCreate, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    profiles_ref = db.collection('shop_profiles')
-    existing = profiles_ref.where('shop_id', '==', x_shop_id).where('name', '==', profile.name).limit(1).get()
-    if len(existing) > 0:
-        raise HTTPException(status_code=400, detail="Profile name already exists")
-    
-    new_profile = {
-        "name": profile.name,
-        "shop_id": x_shop_id,
-        "created_at": datetime.now(timezone.utc)
-    }
-    doc_ref = profiles_ref.add(new_profile)[1]
-    return {**new_profile, "id": doc_ref.id}
+@app.post("/api/shops/{shop_id}/profiles", response_model=ShopProfileResponse)
+def create_profile(shop_id: int, profile: ShopProfileCreate, db: Session = Depends(get_db)):
+    new_profile = ShopProfile(shop_id=shop_id, name=profile.name)
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
+    return new_profile
 
-@app.get("/api/profiles", response_model=List[ShopProfileResponse])
-def get_profiles(x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    docs = db.collection('shop_profiles').where('shop_id', '==', x_shop_id).get()
-    return [{**doc.to_dict(), "id": doc.id} for doc in docs]
+@app.get("/api/shops/{shop_id}/profiles", response_model=List[ShopProfileResponse])
+def list_profiles(shop_id: int, db: Session = Depends(get_db)):
+    return db.query(ShopProfile).filter(ShopProfile.shop_id == shop_id).all()
 
-# --- Items Endpoints ---
+# --- Items ---
 
 @app.post("/api/items", response_model=ItemResponse)
-def create_item(item: ItemCreate, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    items_ref = db.collection('items')
-    existing = items_ref.where('shop_id', '==', x_shop_id).where('name', '==', item.name).limit(1).get()
-    if len(existing) > 0:
+def create_item(item: ItemCreate, db: Session = Depends(get_db)):
+    existing = db.query(Item).filter(Item.shop_id == item.shop_id, Item.name == item.name).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Item already exists in this shop")
-    
-    new_item = item.model_dump()
-    new_item["shop_id"] = x_shop_id
-    new_item["created_at"] = datetime.now(timezone.utc)
-    doc_ref = items_ref.add(new_item)[1]
-    return {**new_item, "id": doc_ref.id}
+    new_item = Item(**item.model_dump())
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    return new_item
 
 @app.get("/api/items", response_model=List[ItemResponse])
-def get_items(x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    docs = db.collection('items').where('shop_id', '==', x_shop_id).get()
-    return [{**doc.to_dict(), "id": doc.id} for doc in docs]
+def list_items(shop_id: int, db: Session = Depends(get_db)):
+    return db.query(Item).filter(Item.shop_id == shop_id).all()
 
 @app.get("/api/items/{item_id}", response_model=ItemResponse)
-def get_item(item_id: str, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    doc = db.collection('items').document(item_id).get()
-    if not doc.exists or doc.to_dict().get("shop_id") != x_shop_id:
+def get_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    return {**doc.to_dict(), "id": doc.id}
+    return item
 
 @app.put("/api/items/{item_id}", response_model=ItemResponse)
-def update_item(item_id: str, item_update: ItemUpdate, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    doc_ref = db.collection('items').document(item_id)
-    doc = doc_ref.get()
-    if not doc.exists or doc.to_dict().get("shop_id") != x_shop_id:
+def update_item(item_id: int, update: ItemUpdate, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id, Item.shop_id == x_shop_id).first()
+    if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    
-    update_data = item_update.model_dump(exclude_unset=True)
-    update_data["updated_at"] = datetime.now(timezone.utc)
-    doc_ref.update(update_data)
-    
-    return {**doc.to_dict(), **update_data, "id": doc.id}
+    for field, value in update.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    item.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(item)
+    return item
 
 @app.delete("/api/items/{item_id}")
-def delete_item(item_id: str, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    doc_ref = db.collection('items').document(item_id)
-    doc = doc_ref.get()
-    if not doc.exists or doc.to_dict().get("shop_id") != x_shop_id:
+def delete_item(item_id: int, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id, Item.shop_id == x_shop_id).first()
+    if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    
-    # In Firestore, we manualy delete related or just let them be "orphaned"
-    # For safety, let's delete sales related to this item in this shop
-    sales = db.collection('sales').where('item_id', '==', item_id).get()
-    for sale in sales:
-        sale.reference.delete()
-    
-    doc_ref.delete()
-    return {"message": "Item deleted successfully"}
+    db.delete(item)
+    db.commit()
+    return {"message": "Item deleted"}
 
-# --- Sales Endpoints ---
+# --- Sales ---
 
 @app.post("/api/sales", response_model=SaleResponse)
-def create_sale(sale: SaleCreate, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    items_ref = db.collection('items')
-    query = items_ref.where('shop_id', '==', x_shop_id).where('name', '==', sale.item_name).limit(1).get()
-    
-    if len(query) == 0:
-        # Create item if it doesn't exist
-        new_item = {
-            "name": sale.item_name,
-            "shop_id": x_shop_id,
-            "current_stock": 0,
-            "low_stock_threshold": 2,
-            "selling_price": sale.selling_price,
-            "cost_price": 0,
-            "created_at": datetime.now(timezone.utc)
-        }
-        item_doc_ref = items_ref.add(new_item)[1]
-        item_id = item_doc_ref.id
-        item_data = new_item
-    else:
-        item_doc = query[0]
-        item_id = item_doc.id
-        item_data = item_doc.to_dict()
-
+def record_sale(sale: SaleCreate, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.shop_id == sale.shop_id, Item.name == sale.item_name).first()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Item '{sale.item_name}' not found")
+    if item.current_stock < sale.quantity:
+        raise HTTPException(status_code=400, detail="Insufficient stock")
+    item.current_stock -= sale.quantity
+    item.updated_at = datetime.now(timezone.utc)
     sale_date = sale.sale_date or datetime.now(timezone.utc)
-    new_sale = {
-        "item_id": item_id,
-        "item_name": item_data["name"],
-        "shop_id": x_shop_id,
-        "quantity": sale.quantity,
-        "selling_price": sale.selling_price,
-        "sale_date": sale_date,
-        "recorded_by": sale.recorded_by,
-        "created_at": datetime.now(timezone.utc)
-    }
-    
-    doc_ref = db.collection('sales').add(new_sale)[1]
-    
-    # Update stock
-    new_stock = max(0, item_data.get("current_stock", 0) - sale.quantity)
-    db.collection('items').document(item_id).update({"current_stock": new_stock})
-    
-    return {**new_sale, "id": doc_ref.id}
+    new_sale = Sale(
+        shop_id=sale.shop_id,
+        item_id=item.id,
+        quantity=sale.quantity,
+        selling_price=sale.selling_price,
+        sale_date=sale_date,
+        recorded_by=sale.recorded_by
+    )
+    db.add(new_sale)
+    db.add(StockHistory(shop_id=sale.shop_id, item_id=item.id, quantity_change=-sale.quantity, change_type='sale'))
+    db.commit()
+    db.refresh(new_sale)
+    return {**new_sale.__dict__, "item_name": item.name}
 
 @app.get("/api/sales", response_model=List[SaleResponse])
-def get_sales(x_shop_id: str = Header(...), start_date: datetime = None, end_date: datetime = None, limit: int = 100, db: firestore.Client = Depends(get_db)):
-    query = db.collection('sales').where('shop_id', '==', x_shop_id).order_by('sale_date', direction=firestore.Query.DESCENDING)
-    
-    if start_date:
-        query = query.where('sale_date', '>=', start_date)
-    if end_date:
-        query = query.where('sale_date', '<=', end_date)
-        
-    docs = query.limit(limit).get()
-    return [{**doc.to_dict(), "id": doc.id} for doc in docs]
+def list_sales(shop_id: int, limit: int = 50, db: Session = Depends(get_db)):
+    sales = db.query(Sale).filter(Sale.shop_id == shop_id).order_by(Sale.sale_date.desc()).limit(limit).all()
+    result = []
+    for s in sales:
+        item = db.query(Item).filter(Item.id == s.item_id).first()
+        result.append({**s.__dict__, "item_name": item.name if item else "Unknown"})
+    return result
 
-# --- Customer & Debt Endpoints ---
+@app.put("/api/sales/{sale_id}", response_model=SaleResponse)
+def update_sale(sale_id: int, update: SaleUpdate, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    sale = db.query(Sale).filter(Sale.id == sale_id, Sale.shop_id == x_shop_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    item = db.query(Item).filter(Item.id == sale.item_id).first()
+    stock_diff = sale.quantity - update.quantity
+    item.current_stock += stock_diff
+    item.updated_at = datetime.now(timezone.utc)
+    sale.quantity = update.quantity
+    sale.selling_price = update.selling_price
+    db.commit()
+    db.refresh(sale)
+    return {**sale.__dict__, "item_name": item.name if item else "Unknown"}
 
-@app.post("/api/customers", response_model=CustomerResponse)
-def create_customer(customer: CustomerCreate, x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    customers_ref = db.collection('customers')
-    new_customer = customer.model_dump()
-    new_customer["shop_id"] = x_shop_id
-    new_customer["total_debt"] = 0.0
-    new_customer["created_at"] = datetime.now(timezone.utc)
-    doc_ref = customers_ref.add(new_customer)[1]
-    return {**new_customer, "id": doc_ref.id}
+@app.delete("/api/sales/{sale_id}")
+def delete_sale(sale_id: int, x_shop_id: int = Header(...), db: Session = Depends(get_db)):
+    sale = db.query(Sale).filter(Sale.id == sale_id, Sale.shop_id == x_shop_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    item = db.query(Item).filter(Item.id == sale.item_id).first()
+    if item:
+        item.current_stock += sale.quantity
+        item.updated_at = datetime.now(timezone.utc)
+    db.delete(sale)
+    db.commit()
+    return {"message": "Sale deleted and stock restored"}
 
-@app.get("/api/customers", response_model=List[CustomerResponse])
-def get_customers(x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
-    docs = db.collection('customers').where('shop_id', '==', x_shop_id).get()
-    return [{**doc.to_dict(), "id": doc.id} for doc in docs]
-
-# --- Dashboard Stats ---
+# --- Dashboard ---
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
-def get_dashboard_stats(x_shop_id: str = Header(...), db: firestore.Client = Depends(get_db)):
+def get_dashboard_stats(shop_id: int, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)
-    
-    try:
-        sales_docs = db.collection('sales').where('shop_id', '==', x_shop_id).where('sale_date', '>=', month_start).get()
-        items_docs = db.collection('items').where('shop_id', '==', x_shop_id).get()
-        
-        items_map = {doc.id: doc.to_dict() for doc in items_docs}
-        sales = [doc.to_dict() for doc in sales_docs]
-        
-        def calc_profit(s_list):
-            p = 0
-            for s in s_list:
-                item = items_map.get(s['item_id'], {})
-                p += (s['selling_price'] - item.get('cost_price', 0)) * s['quantity']
-            return p
 
-        daily_sales = [s for s in sales if s['sale_date'] >= today_start]
-        weekly_sales = [s for s in sales if s['sale_date'] >= week_start]
-        
-        low_stock = [ {**item, "id": id} for id, item in items_map.items() if item.get('current_stock', 0) <= item.get('low_stock_threshold', 2)]
-        
-        # Best selling (simple aggregation)
-        best_selling_map = {}
+    def get_sales_in_period(start):
+        return db.query(Sale).filter(Sale.shop_id == shop_id, Sale.sale_date >= start).all()
+
+    def calc_profit(sales):
+        profit = 0.0
         for s in sales:
-            name = s['item_name']
-            best_selling_map[name] = best_selling_map.get(name, 0) + s['quantity']
-        
-        best_selling_items = sorted([{"name": k, "quantity": v} for k, v in best_selling_map.items()], key=lambda x: x['quantity'], reverse=True)[:5]
-        
-        return DashboardStats(
-            daily_profit=calc_profit(daily_sales),
-            weekly_profit=calc_profit(weekly_sales),
-            monthly_profit=calc_profit(sales),
-            total_sales_today=sum(s['quantity'] for s in daily_sales),
-            total_sales_week=sum(s['quantity'] for s in weekly_sales),
-            total_sales_month=sum(s['quantity'] for s in sales),
-            low_stock_items=low_stock,
-            best_selling_items=best_selling_items,
-            slow_moving_items=[] # Simplified
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            item = db.query(Item).filter(Item.id == s.item_id).first()
+            if item:
+                profit += (s.selling_price - item.cost_price) * s.quantity
+        return round(profit, 2)
+
+    today_sales = get_sales_in_period(today_start)
+    week_sales = get_sales_in_period(week_start)
+    month_sales = get_sales_in_period(month_start)
+
+    low_stock = db.query(Item).filter(Item.shop_id == shop_id, Item.current_stock <= Item.low_stock_threshold).all()
+
+    from sqlalchemy import func
+    best_raw = db.query(Sale.item_id, func.sum(Sale.quantity).label("total_qty"))\
+        .filter(Sale.shop_id == shop_id, Sale.sale_date >= month_start)\
+        .group_by(Sale.item_id).order_by(func.sum(Sale.quantity).desc()).limit(5).all()
+    best_selling = []
+    for row in best_raw:
+        item = db.query(Item).filter(Item.id == row.item_id).first()
+        if item:
+            best_selling.append({"name": item.name, "total_quantity_sold": row.total_qty})
+
+    slow_raw = db.query(Sale.item_id, func.sum(Sale.quantity).label("total_qty"))\
+        .filter(Sale.shop_id == shop_id, Sale.sale_date >= month_start)\
+        .group_by(Sale.item_id).order_by(func.sum(Sale.quantity).asc()).limit(5).all()
+    slow_moving = []
+    for row in slow_raw:
+        item = db.query(Item).filter(Item.id == row.item_id).first()
+        if item:
+            slow_moving.append({"name": item.name, "total_quantity_sold": row.total_qty})
+
+    return DashboardStats(
+        daily_profit=calc_profit(today_sales),
+        weekly_profit=calc_profit(week_sales),
+        monthly_profit=calc_profit(month_sales),
+        total_sales_today=len(today_sales),
+        total_sales_week=len(week_sales),
+        total_sales_month=len(month_sales),
+        low_stock_items=low_stock,
+        best_selling_items=best_selling,
+        slow_moving_items=slow_moving
+    )
+
+# --- Customers ---
+
+@app.post("/api/customers", response_model=CustomerResponse)
+def create_customer(customer: CustomerCreate, db: Session = Depends(get_db)):
+    new_customer = Customer(**customer.model_dump())
+    db.add(new_customer)
+    db.commit()
+    db.refresh(new_customer)
+    return new_customer
+
+@app.get("/api/customers", response_model=List[CustomerResponse])
+def list_customers(shop_id: int, db: Session = Depends(get_db)):
+    return db.query(Customer).filter(Customer.shop_id == shop_id).all()
+
+@app.get("/api/customers/{customer_id}", response_model=CustomerResponse)
+def get_customer(customer_id: int, db: Session = Depends(get_db)):
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return customer
+
+@app.delete("/api/customers/{customer_id}")
+def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    db.delete(customer)
+    db.commit()
+    return {"message": "Customer deleted"}
+
+# --- Debt Records ---
+
+@app.post("/api/debts", response_model=DebtRecordResponse)
+def create_debt(debt: DebtRecordCreate, db: Session = Depends(get_db)):
+    customer = db.query(Customer).filter(Customer.id == debt.customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    if debt.type == 'debt':
+        customer.total_debt += debt.amount
+    elif debt.type == 'payment':
+        customer.total_debt = max(0, customer.total_debt - debt.amount)
+    new_debt = DebtRecord(**debt.model_dump())
+    db.add(new_debt)
+    db.commit()
+    db.refresh(new_debt)
+    return new_debt
+
+@app.get("/api/debts/{customer_id}", response_model=List[DebtRecordResponse])
+def list_debts(customer_id: int, db: Session = Depends(get_db)):
+    return db.query(DebtRecord).filter(DebtRecord.customer_id == customer_id).order_by(DebtRecord.date.desc()).all()
+
+# --- AI Assistant ---
 
 @app.post("/api/ai/chat", response_model=AIChatResponse)
-def ai_chat(request: AIChatRequest, db: firestore.Client = Depends(get_db)):
-    ai_service = AIService(db)
-    result = ai_service.chat(request.message, shop_id=request.shop_id)
-    return AIChatResponse(**result)
-
-# ... other AI endpoints similarly ...
+def ai_chat(request: AIChatRequest, db: Session = Depends(get_db)):
+    try:
+        ai = AIService(db)
+        response = ai.chat(request.message, request.shop_id, request.context)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
