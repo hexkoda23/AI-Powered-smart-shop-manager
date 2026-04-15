@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { itemsApi, aiApi, Item, DeepInsight } from '../../lib/api';
-import { Plus, Edit2, Trash2, AlertTriangle, Package, X, Save, TrendingUp, Info, Zap, Copy, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, X, Save, TrendingUp, Info, Zap, Copy, Check, Upload, Download } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
 import { UserCheck, User as UserIcon } from 'lucide-react';
@@ -21,6 +21,12 @@ export default function StockPage() {
   const [restockQty, setRestockQty] = useState<number>(0);
   const [copied, setCopied] = useState(false);
   const [role, setRole] = useState<Role>(null);
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [csvError, setCsvError] = useState('');
+  const [csvResult, setCsvResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -106,6 +112,62 @@ export default function StockPage() {
     }
   };
 
+  const downloadTemplate = () => {
+    const csv = 'name,current_stock,low_stock_threshold,selling_price,cost_price\nIndomie Chicken,50,10,200,130\nSugar 1kg,30,5,900,700\nPalm Oil 75cl,20,5,1500,1100';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'notable_items_template.csv';
+    a.click();
+  };
+
+  const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCsvError('');
+    setCsvPreview([]);
+    setCsvResult(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      const lines = text.trim().split('\n').filter(l => l.trim());
+      if (lines.length < 2) { setCsvError('CSV must have a header row and at least one data row.'); return; }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const requiredHeaders = ['name', 'current_stock', 'selling_price', 'cost_price'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) { setCsvError(`Missing columns: ${missingHeaders.join(', ')}`); return; }
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        return {
+          name: values[headers.indexOf('name')] || '',
+          current_stock: parseInt(values[headers.indexOf('current_stock')]) || 0,
+          low_stock_threshold: headers.includes('low_stock_threshold') ? (parseInt(values[headers.indexOf('low_stock_threshold')]) || 2) : 2,
+          selling_price: parseFloat(values[headers.indexOf('selling_price')]) || 0,
+          cost_price: parseFloat(values[headers.indexOf('cost_price')]) || 0,
+        };
+      }).filter(r => r.name);
+      if (rows.length === 0) { setCsvError('No valid rows found in CSV.'); return; }
+      setCsvPreview(rows);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    if (csvPreview.length === 0) return;
+    setCsvImporting(true);
+    try {
+      const result = await itemsApi.bulkImport(csvPreview);
+      setCsvResult({ created: result.created, skipped: result.skipped });
+      setCsvPreview([]);
+      await loadData();
+    } catch (err) {
+      setCsvError('Import failed. Please try again.');
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
   const handleAutoGenerateOrder = () => {
     const highRisk = insights.filter(i => i.restock_score >= 50);
     if (highRisk.length === 0) return;
@@ -133,7 +195,7 @@ export default function StockPage() {
             <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Inventory</h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             {role && (
               <div className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
@@ -147,6 +209,15 @@ export default function StockPage() {
                 </span>
               </div>
             )}
+
+            <button
+              onClick={() => { setShowCsvModal(true); setCsvPreview([]); setCsvError(''); setCsvResult(null); }}
+              className="btn btn-outline"
+              style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+            >
+              <Upload size={16} />
+              BULK_IMPORT
+            </button>
 
             <button
               onClick={() => handleOpenModal('add')}
@@ -471,6 +542,94 @@ export default function StockPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Bulk Import Modal */}
+      {showCsvModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+          <div className="card p-8 w-full max-w-2xl relative animate-in zoom-in-95 duration-200" style={{ backgroundColor: 'var(--bg-2)', border: '1px solid var(--border-2)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button onClick={() => setShowCsvModal(false)} className="absolute top-4 right-4 p-2 hover:bg-[var(--bg-3)] rounded-full text-[var(--text-3)]"><X size={20} /></button>
+
+            <div className="flex items-center gap-3 mb-2">
+              <Upload size={20} color="var(--accent)" />
+              <h3 style={{ fontSize: '1.5rem' }}>Bulk Import Items</h3>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', marginBottom: '1.5rem' }}>Upload a CSV file to add many items at once. Duplicate item names will be skipped.</p>
+
+            {/* Template Download */}
+            <div className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] mb-6 flex items-center justify-between">
+              <div>
+                <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>📄 Download Template</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>Fill in your items then upload below</p>
+              </div>
+              <button onClick={downloadTemplate} className="btn btn-outline flex items-center gap-2" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                <Download size={14} /> Template
+              </button>
+            </div>
+
+            {/* File Upload */}
+            <div
+              className="border-2 border-dashed rounded-[var(--radius)] p-8 text-center cursor-pointer mb-4"
+              style={{ borderColor: 'var(--border-2)' }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={32} style={{ margin: '0 auto 0.75rem', color: 'var(--text-3)' }} />
+              <p style={{ fontWeight: 600 }}>Click to select your CSV file</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>Columns: name, current_stock, low_stock_threshold, selling_price, cost_price</p>
+              <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFile} className="hidden" />
+            </div>
+
+            {csvError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem' }}>⚠️ {csvError}</p>}
+
+            {/* Result */}
+            {csvResult && (
+              <div className="p-4 rounded-[var(--radius)] bg-[var(--accent)]/10 border border-[var(--accent)]/30 mb-4">
+                <p style={{ fontWeight: 700, color: 'var(--accent)' }}>✅ Import Complete!</p>
+                <p style={{ fontSize: '0.85rem' }}>{csvResult.created} items added · {csvResult.skipped} skipped (already exist)</p>
+              </div>
+            )}
+
+            {/* Preview Table */}
+            {csvPreview.length > 0 && (
+              <div className="mb-6">
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', marginBottom: '0.75rem' }}>PREVIEW — {csvPreview.length} items ready to import</p>
+                <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>NAME</th>
+                        <th className="text-right">STOCK</th>
+                        <th className="text-right">ALERT</th>
+                        <th className="text-right">COST</th>
+                        <th className="text-right">SELL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.map((row, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600 }}>{row.name}</td>
+                          <td className="text-right mono">{row.current_stock}</td>
+                          <td className="text-right mono">{row.low_stock_threshold}</td>
+                          <td className="text-right mono">{row.cost_price.toLocaleString()}</td>
+                          <td className="text-right mono">{row.selling_price.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-4 mt-4">
+              <button onClick={() => setShowCsvModal(false)} className="btn btn-outline flex-1">Close</button>
+              {csvPreview.length > 0 && (
+                <button onClick={handleCsvImport} disabled={csvImporting} className="btn btn-primary flex-1">
+                  {csvImporting ? 'IMPORTING...' : `IMPORT ${csvPreview.length} ITEMS`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

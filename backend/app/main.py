@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -186,6 +187,47 @@ def delete_item(item_id: int, x_shop_id: int = Header(...), db: Session = Depend
     db.delete(item)
     db.commit()
     return {"message": "Item deleted"}
+
+class BulkItemRow(BaseModel):
+    name: str
+    current_stock: int = 0
+    low_stock_threshold: int = 2
+    selling_price: float = 0.0
+    cost_price: float = 0.0
+
+class BulkImportRequest(BaseModel):
+    shop_id: int
+    items: List[BulkItemRow]
+
+@app.post("/api/items/bulk-import")
+def bulk_import_items(payload: BulkImportRequest, db: Session = Depends(get_db)):
+    created = []
+    skipped = []
+    for row in payload.items:
+        name = row.name.strip()
+        if not name:
+            continue
+        existing = db.query(Item).filter(Item.shop_id == payload.shop_id, Item.name == name).first()
+        if existing:
+            skipped.append(name)
+            continue
+        new_item = Item(
+            shop_id=payload.shop_id,
+            name=name,
+            current_stock=row.current_stock,
+            low_stock_threshold=row.low_stock_threshold,
+            selling_price=row.selling_price,
+            cost_price=row.cost_price,
+        )
+        db.add(new_item)
+        created.append(name)
+    db.commit()
+    return {
+        "created": len(created),
+        "skipped": len(skipped),
+        "created_names": created,
+        "skipped_names": skipped
+    }
 
 # --- Sales ---
 

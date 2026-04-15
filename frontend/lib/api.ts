@@ -196,6 +196,13 @@ export const itemsApi = {
       method: 'DELETE',
     });
   },
+  bulkImport: async (items: Array<{ name: string; current_stock: number; low_stock_threshold: number; selling_price: number; cost_price: number }>): Promise<{ created: number; skipped: number; created_names: string[]; skipped_names: string[] }> => {
+    const shopId = getShopId();
+    return request<{ created: number; skipped: number; created_names: string[]; skipped_names: string[] }>('/api/items/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify({ shop_id: shopId ? parseInt(shopId) : 0, items }),
+    });
+  },
 };
 
 export const salesApi = {
