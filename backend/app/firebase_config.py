@@ -6,7 +6,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+_db_client = None
+
 def initialize_firebase():
+    global _db_client
+    if _db_client is not None:
+        return _db_client
+
     if not firebase_admin._apps:
         config_json = os.getenv("FIREBASE_CONFIG_JSON")
         if config_json:
@@ -33,36 +39,20 @@ def initialize_firebase():
         else:
             raise RuntimeError("Missing FIREBASE_CONFIG_JSON or FIREBASE_SERVICE_ACCOUNT.")
 
-    # Try to get project name from the app
     current_app = firebase_admin.get_app()
     proj_id = current_app.project_id
-    print(f"DEBUG: Using Project ID: {proj_id}")
 
-    # FORCE explicit project and database ID
-    # This addresses the "database (default) does not exist" issue by being non-ambiguous
+    # Create client but DON'T make network calls yet to avoid startup Timeout/Crash
     try:
-        client = firestore.client(project=proj_id, database="(default)")
-        print(f"DEBUG: Firestore client created for project {proj_id} and database (default)")
+        _db_client = firestore.client(project=proj_id, database="(default)")
+        print(f"DEBUG: Firestore client created for project {proj_id}")
     except Exception as e:
         print(f"DEBUG ERROR: Failed to create client: {e}")
-        client = firestore.client() # Fallback
+        _db_client = firestore.client() 
 
-    try:
-        # Check if we can reach the project
-        print(f"DEBUG: Attempting to list collections in project {proj_id}...")
-        colls = list(client.collections())
-        print(f"DEBUG: Success! Found {len(colls)} collections.")
-    except Exception as e:
-        print(f"DEBUG ERROR: Connection check failed: {e}")
-        # This will likely show the 'database (default) does not exist' error
-
-        
-    return client
-
-db = initialize_firebase()
-
-
+    return _db_client
 
 def get_db():
-    return db
+    return initialize_firebase()
+
 
