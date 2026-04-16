@@ -85,7 +85,7 @@ Respond in English. Keep responses under 150 words."""
 
         try:
             response = client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
