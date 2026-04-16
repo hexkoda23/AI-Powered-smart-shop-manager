@@ -105,3 +105,58 @@ Respond in English. Keep responses under 150 words."""
                 "insights": [],
                 "recommendations": []
             }
+
+    def get_deep_insights(self, shop_id: int) -> List[Dict]:
+        from app.models import Item, Sale
+        items = self.db.query(Item).filter(Item.shop_id == shop_id).all()
+        now = datetime.now(timezone.utc)
+        thirty_days_ago = now - timedelta(days=30)
+        
+        insights = []
+        for item in items:
+            # Calculate daily burn rate
+            sales = self.db.query(Sale).filter(
+                Sale.item_id == item.id,
+                Sale.sale_date >= thirty_days_ago
+            ).all()
+            total_qty = sum(s.quantity for s in sales)
+            daily_burn = round(total_qty / 30, 2)
+            
+            # Days remaining
+            if daily_burn > 0:
+                days_left = int(item.current_stock / daily_burn)
+            else:
+                days_left = 999
+            
+            # Restock score (0-100, higher is more urgent)
+            restock_score = max(0, min(100, (14 - days_left) * 7.14)) if days_left < 14 else 0
+            if item.current_stock <= item.low_stock_threshold:
+                restock_score = max(restock_score, 80)
+                
+            insights.append({
+                "id": item.id,
+                "name": item.name,
+                "days_remaining": min(days_left, 999),
+                "daily_burn_rate": daily_burn,
+                "restock_score": round(restock_score, 1),
+                "suggested_restock_qty": int(daily_burn * 30) if daily_burn > 0 else 10
+            })
+            
+        return sorted(insights, key=lambda x: x['restock_score'], reverse=True)
+
+    def get_customer_risk(self, customer_id: int) -> Dict:
+        from app.models import Customer
+        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
+        if not customer:
+            return {"risk": "LOW", "current": 0, "limit": 0}
+            
+        ratio = customer.total_debt / customer.credit_limit if customer.credit_limit > 0 else 1
+        risk = "LOW"
+        if ratio > 0.8: risk = "HIGH"
+        elif ratio > 0.5: risk = "MEDIUM"
+        
+        return {
+            "risk": risk,
+            "current": customer.total_debt,
+            "limit": customer.credit_limit
+        }

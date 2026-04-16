@@ -13,7 +13,7 @@ from app.models import Base, Shop, Item, Sale, Customer, DebtRecord, ShopProfile
 from app.schemas import (
     ItemCreate, ItemUpdate, ItemResponse,
     SaleCreate, SaleResponse, SaleUpdate,
-    DashboardStats, AIChatRequest, AIChatResponse,
+    DashboardStats, AIChatRequest, AIChatResponse, DeepInsight,
     ShopCreate, ShopLogin, ShopResponse, ShopUpdate, ShopOwnerPinSetup,
     CustomerCreate, CustomerResponse, DebtRecordCreate, DebtRecordResponse,
     ShopProfileCreate, ShopProfileResponse
@@ -111,18 +111,18 @@ def update_shop(update: ShopUpdate, x_shop_id: int = Header(..., alias="X-Shop-I
     db.refresh(shop)
     return {**shop.__dict__, "is_pin_set": shop.pin_hash is not None}
 
-@app.post("/api/auth/shop/{shop_id}/set-pin")
-def set_owner_pin(shop_id: int, pin_data: ShopOwnerPinSetup, db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+@app.post("/api/auth/set-owner-pin")
+def set_owner_pin(pin_data: ShopOwnerPinSetup, x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == x_shop_id).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
     shop.pin_hash = pwd_context.hash(pin_data.pin)
     db.commit()
     return {"message": "PIN set successfully"}
 
-@app.post("/api/auth/shop/{shop_id}/verify-pin")
-def verify_pin(shop_id: int, pin_data: ShopOwnerPinSetup, db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+@app.post("/api/auth/verify-owner-pin")
+def verify_pin(pin_data: ShopOwnerPinSetup, x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == x_shop_id).first()
     if not shop or not shop.pin_hash:
         raise HTTPException(status_code=404, detail="PIN not set")
     if not pwd_context.verify(pin_data.pin, shop.pin_hash):
@@ -410,3 +410,31 @@ def ai_chat(request: AIChatRequest, db: Session = Depends(get_db)):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/ai/deep-insights", response_model=List[DeepInsight])
+def get_deep_insights(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    ai = AIService(db)
+    return ai.get_deep_insights(x_shop_id)
+
+@app.get("/api/ai/restock-recommendations")
+def get_restock_recommendations(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    ai = AIService(db)
+    insights = ai.get_deep_insights(x_shop_id)
+    critical = [f"{i['name']} (Stock: {i['days_remaining']} days left)" for i in insights if i['restock_score'] >= 70]
+    return {"recommendations": critical if critical else ["All stock levels are healthy."]}
+
+@app.get("/api/ai/trends")
+def get_trends(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    return {"trends": "Stable growth across core categories."}
+
+@app.get("/api/ai/customer-risk/{customer_id}")
+def get_customer_risk(customer_id: int, db: Session = Depends(get_db)):
+    ai = AIService(db)
+    return ai.get_customer_risk(customer_id)
+
+@app.get("/api/ai/suggestions/{item_id}")
+def get_suggestions(item_id: int, db: Session = Depends(get_db)):
+    return [
+        {"name": "Bundle offer", "type": "margin", "reason": "High demand item"},
+        {"name": "Suggest complementary", "type": "upsell", "reason": "Commonly bought together"}
+    ]

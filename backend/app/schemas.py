@@ -142,3 +142,11 @@ class AIChatResponse(BaseModel):
     response: str
     insights: Optional[List[str]] = None
     recommendations: Optional[List[str]] = None
+
+class DeepInsight(BaseModel):
+    id: int
+    name: str
+    days_remaining: int
+    daily_burn_rate: float
+    restock_score: float
+    suggested_restock_qty: int
