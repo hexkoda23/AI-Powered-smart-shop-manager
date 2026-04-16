@@ -96,9 +96,9 @@ def get_shop(shop_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Shop not found")
     return {**shop.__dict__, "is_pin_set": shop.pin_hash is not None}
 
-@app.put("/api/auth/shop/{shop_id}", response_model=ShopResponse)
-def update_shop(shop_id: int, update: ShopUpdate, db: Session = Depends(get_db)):
-    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+@app.put("/api/shops/settings", response_model=ShopResponse)
+def update_shop(update: ShopUpdate, x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.id == x_shop_id).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
     if update.name:
@@ -131,17 +131,17 @@ def verify_pin(shop_id: int, pin_data: ShopOwnerPinSetup, db: Session = Depends(
 
 # --- Shop Profiles ---
 
-@app.post("/api/shops/{shop_id}/profiles", response_model=ShopProfileResponse)
-def create_profile(shop_id: int, profile: ShopProfileCreate, db: Session = Depends(get_db)):
-    new_profile = ShopProfile(shop_id=shop_id, name=profile.name)
+@app.post("/api/profiles", response_model=ShopProfileResponse)
+def create_profile(profile: ShopProfileCreate, x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    new_profile = ShopProfile(shop_id=x_shop_id, name=profile.name)
     db.add(new_profile)
     db.commit()
     db.refresh(new_profile)
     return new_profile
 
-@app.get("/api/shops/{shop_id}/profiles", response_model=List[ShopProfileResponse])
-def list_profiles(shop_id: int, db: Session = Depends(get_db)):
-    return db.query(ShopProfile).filter(ShopProfile.shop_id == shop_id).all()
+@app.get("/api/profiles", response_model=List[ShopProfileResponse])
+def list_profiles(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    return db.query(ShopProfile).filter(ShopProfile.shop_id == x_shop_id).all()
 
 # --- Items ---
 
@@ -157,8 +157,8 @@ def create_item(item: ItemCreate, db: Session = Depends(get_db)):
     return new_item
 
 @app.get("/api/items", response_model=List[ItemResponse])
-def list_items(shop_id: int, db: Session = Depends(get_db)):
-    return db.query(Item).filter(Item.shop_id == shop_id).all()
+def list_items(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    return db.query(Item).filter(Item.shop_id == x_shop_id).all()
 
 @app.get("/api/items/{item_id}", response_model=ItemResponse)
 def get_item(item_id: int, db: Session = Depends(get_db)):
@@ -256,8 +256,8 @@ def record_sale(sale: SaleCreate, db: Session = Depends(get_db)):
     return {**new_sale.__dict__, "item_name": item.name}
 
 @app.get("/api/sales", response_model=List[SaleResponse])
-def list_sales(shop_id: int, limit: int = 50, db: Session = Depends(get_db)):
-    sales = db.query(Sale).filter(Sale.shop_id == shop_id).order_by(Sale.sale_date.desc()).limit(limit).all()
+def list_sales(x_shop_id: int = Header(..., alias="X-Shop-Id"), limit: int = 50, db: Session = Depends(get_db)):
+    sales = db.query(Sale).filter(Sale.shop_id == x_shop_id).order_by(Sale.sale_date.desc()).limit(limit).all()
     result = []
     for s in sales:
         item = db.query(Item).filter(Item.id == s.item_id).first()
@@ -295,14 +295,14 @@ def delete_sale(sale_id: int, x_shop_id: int = Header(...), db: Session = Depend
 # --- Dashboard ---
 
 @app.get("/api/dashboard/stats", response_model=DashboardStats)
-def get_dashboard_stats(shop_id: int, db: Session = Depends(get_db)):
+def get_dashboard_stats(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=7)
     month_start = today_start - timedelta(days=30)
 
     def get_sales_in_period(start):
-        return db.query(Sale).filter(Sale.shop_id == shop_id, Sale.sale_date >= start).all()
+        return db.query(Sale).filter(Sale.shop_id == x_shop_id, Sale.sale_date >= start).all()
 
     def calc_profit(sales):
         profit = 0.0
@@ -316,11 +316,11 @@ def get_dashboard_stats(shop_id: int, db: Session = Depends(get_db)):
     week_sales = get_sales_in_period(week_start)
     month_sales = get_sales_in_period(month_start)
 
-    low_stock = db.query(Item).filter(Item.shop_id == shop_id, Item.current_stock <= Item.low_stock_threshold).all()
+    low_stock = db.query(Item).filter(Item.shop_id == x_shop_id, Item.current_stock <= Item.low_stock_threshold).all()
 
     from sqlalchemy import func
     best_raw = db.query(Sale.item_id, func.sum(Sale.quantity).label("total_qty"))\
-        .filter(Sale.shop_id == shop_id, Sale.sale_date >= month_start)\
+        .filter(Sale.shop_id == x_shop_id, Sale.sale_date >= month_start)\
         .group_by(Sale.item_id).order_by(func.sum(Sale.quantity).desc()).limit(5).all()
     best_selling = []
     for row in best_raw:
@@ -329,7 +329,7 @@ def get_dashboard_stats(shop_id: int, db: Session = Depends(get_db)):
             best_selling.append({"name": item.name, "total_quantity_sold": row.total_qty})
 
     slow_raw = db.query(Sale.item_id, func.sum(Sale.quantity).label("total_qty"))\
-        .filter(Sale.shop_id == shop_id, Sale.sale_date >= month_start)\
+        .filter(Sale.shop_id == x_shop_id, Sale.sale_date >= month_start)\
         .group_by(Sale.item_id).order_by(func.sum(Sale.quantity).asc()).limit(5).all()
     slow_moving = []
     for row in slow_raw:
@@ -360,8 +360,8 @@ def create_customer(customer: CustomerCreate, db: Session = Depends(get_db)):
     return new_customer
 
 @app.get("/api/customers", response_model=List[CustomerResponse])
-def list_customers(shop_id: int, db: Session = Depends(get_db)):
-    return db.query(Customer).filter(Customer.shop_id == shop_id).all()
+def list_customers(x_shop_id: int = Header(..., alias="X-Shop-Id"), db: Session = Depends(get_db)):
+    return db.query(Customer).filter(Customer.shop_id == x_shop_id).all()
 
 @app.get("/api/customers/{customer_id}", response_model=CustomerResponse)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
@@ -381,7 +381,7 @@ def delete_customer(customer_id: int, db: Session = Depends(get_db)):
 
 # --- Debt Records ---
 
-@app.post("/api/debts", response_model=DebtRecordResponse)
+@app.post("/api/debt/records", response_model=DebtRecordResponse)
 def create_debt(debt: DebtRecordCreate, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter(Customer.id == debt.customer_id).first()
     if not customer:
@@ -396,7 +396,7 @@ def create_debt(debt: DebtRecordCreate, db: Session = Depends(get_db)):
     db.refresh(new_debt)
     return new_debt
 
-@app.get("/api/debts/{customer_id}", response_model=List[DebtRecordResponse])
+@app.get("/api/debt/records/{customer_id}", response_model=List[DebtRecordResponse])
 def list_debts(customer_id: int, db: Session = Depends(get_db)):
     return db.query(DebtRecord).filter(DebtRecord.customer_id == customer_id).order_by(DebtRecord.date.desc()).all()
 
