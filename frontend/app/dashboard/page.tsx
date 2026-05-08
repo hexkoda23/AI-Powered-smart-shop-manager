@@ -1,392 +1,226 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AlertTriangle, Calendar, DollarSign, Package, RefreshCcw, ShoppingCart, UserCheck, User as UserIcon } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Navbar from '../../components/Navbar';
 import StatCard from '../../components/StatCard';
-import { DashboardStats, salesApi, Sale } from '../../lib/api';
-import { dashboardApi } from '../../lib/api';
-import { getShopContext, getRole, Role, isOwnerSessionValid, getWorkerProfile } from '../../lib/auth';
-import { useRouter } from 'next/navigation';
-import { DollarSign, TrendingUp, Package, AlertTriangle, Calendar, ShoppingCart, Info, UserCheck, User as UserIcon, RefreshCcw, History } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { cn, formatCurrency } from '../../lib/utils';
+import { DashboardStats, Sale, dashboardApi, salesApi } from '../../lib/api';
+import { Role, getRole, getShopContext, getWorkerProfile } from '../../lib/auth';
+import { cn, formatCurrency, formatDateTime } from '../../lib/utils';
 
 export default function DashboardPage() {
-    const router = useRouter();
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [recentSales, setRecentSales] = useState<Sale[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [activeStore, setActiveStore] = useState('Default');
-    const [role, setRole] = useState<Role>(null);
+  const router = useRouter();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeStore, setActiveStore] = useState('Notable');
+  const [role, setRole] = useState<Role>(null);
 
-    useEffect(() => {
-        const context = getShopContext();
-        if (!context.id) {
-            router.replace('/login');
-            return;
-        }
-
-        loadStats();
-        if (context.name) setActiveStore(context.name);
-        setRole(getRole());
-    }, [router]);
-
-    const loadStats = async () => {
-        try {
-            setErrorMsg(null);
-            const [statsData, salesData] = await Promise.all([
-                dashboardApi.getStats(),
-                salesApi.getAll({ limit: 10 })
-            ]);
-            setStats(statsData);
-            setRecentSales(salesData);
-        } catch (error: any) {
-            console.error('Failed to load stats:', error);
-            setErrorMsg(error?.response?.data?.detail || 'CONNECTION_FAILED');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen page-enter" style={{ backgroundColor: 'var(--bg)' }}>
-                <Navbar />
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="w-12 h-12 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
-                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '0.8rem' }}>
-                            INITIALIZING DASHBOARD...
-                        </span>
-                    </div>
-                </div>
-            </div>
-        );
+  useEffect(() => {
+    const context = getShopContext();
+    if (!context.id) {
+      router.replace('/login');
+      return;
     }
+    if (context.name) setActiveStore(context.name);
+    setRole(getRole());
+    loadStats();
+  }, [router]);
 
-    if (!stats) {
-        return (
-            <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
-                <Navbar />
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-                    <div className="card border-[var(--danger)]/30 text-center max-w-xl mx-auto py-16">
-                        <div className="w-20 h-20 rounded-full bg-[var(--danger)]/10 flex items-center justify-center mx-auto mb-6">
-                            <AlertTriangle size={40} color="var(--danger)" />
-                        </div>
-                        <h2 style={{ color: 'var(--white)', fontSize: '1.75rem', marginBottom: '0.5rem' }}>DASHBOARD_SYNC_FAILURE</h2>
-                        <p style={{ color: 'var(--text-3)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                            We encountered a problem establishing a secure connection to your shop database. This may be due to an expired session or temporary system maintenance.
-                        </p>
-                        {errorMsg && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-[0.7rem] font-mono mb-6 break-all">
-                                ERROR_LOG: {errorMsg}
-                            </div>
-                        )}
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button
-                                onClick={() => { setLoading(true); loadStats(); }}
-                                className="btn btn-primary flex items-center justify-center gap-2 px-8"
-                            >
-                                <RefreshCcw size={18} />
-                                RETRY_CONNECTION
-                            </button>
-                            <button
-                                onClick={() => router.push('/login')}
-                                className="btn btn-outline px-8"
-                            >
-                                RE-AUTHENTICATE
-                            </button>
-                            <button
-                                onClick={() => router.push('/register')}
-                                className="btn btn-outline px-8 border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent-dim)]"
-                            >
-                                INITIALIZE_NEW_SHOP
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      setErrorMsg(null);
+      const [statsData, salesData] = await Promise.all([
+        dashboardApi.getStats(),
+        salesApi.getAll({ limit: 10 }),
+      ]);
+      setStats(statsData);
+      setRecentSales(salesData);
+    } catch (error: any) {
+      console.error('Failed to load stats:', error);
+      setErrorMsg(error?.response?.data?.detail || 'Could not reach the shop server.');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const bestSellingData = stats.best_selling_items.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-    }));
+  const todayRevenue = useMemo(() => {
+    const today = new Date().toDateString();
+    return recentSales
+      .filter((sale) => new Date(sale.sale_date).toDateString() === today)
+      .reduce((sum, sale) => sum + sale.quantity * sale.selling_price, 0);
+  }, [recentSales]);
 
+  const chartData = stats ? [
+    { name: 'Today', profit: stats.daily_profit },
+    { name: 'Week', profit: stats.weekly_profit },
+    { name: 'Month', profit: stats.monthly_profit },
+  ] : [];
+
+  if (loading) {
     return (
-        <div className="min-h-screen page-enter" style={{ backgroundColor: 'var(--bg)' }}>
-            <Navbar />
-
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="badge badge-accent">Operational</span>
-                            <span className="badge badge-info">Store: {activeStore}</span>
-                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '0.7rem' }}>
-                                LAST_SYNC: {new Date().toLocaleTimeString()}
-                            </span>
-                        </div>
-                        <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Overview</h1>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        {role && (
-                            <div className={cn(
-                                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
-                                role === 'owner'
-                                    ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
-                                    : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
-                            )}>
-                                {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
-                                <span className="font-display font-bold tracking-widest text-xs uppercase">
-                                    {role === 'owner' ? 'Owner' : (getWorkerProfile() || 'Worker')}
-                                </span>
-                            </div>
-                        )}
-
-                        <div className="card p-3 flex items-center gap-3" style={{ padding: '0.75rem 1.25rem' }}>
-                            <Calendar size={18} color="var(--accent)" />
-                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* KPI Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                    <StatCard
-                        title="Daily Profit"
-                        value={stats.daily_profit}
-                        icon={DollarSign}
-                        isCurrency
-                        trend={{ value: 12.5, isPositive: true }}
-                    />
-                    <StatCard
-                        title="Weekly Profit"
-                        value={stats.weekly_profit}
-                        icon={TrendingUp}
-                        isCurrency
-                        trend={{ value: 4.2, isPositive: true }}
-                    />
-                    <StatCard
-                        title="Monthly Profit"
-                        value={stats.monthly_profit}
-                        icon={DollarSign}
-                        isCurrency
-                        trend={{ value: 2.1, isPositive: false }}
-                    />
-                    <div
-                        onClick={() => router.push('/stock')}
-                        className="cursor-pointer transition-transform hover:scale-[1.02]"
-                        title="View Low Stock Items in Inventory"
-                    >
-                        <StatCard
-                            title="Inventory Risk"
-                            value={stats.low_stock_items.length}
-                            icon={AlertTriangle}
-                        />
-                    </div>
-                </div>
-
-                {/* Volume Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                    {[
-                        { label: 'TODAY_VOLUME', val: stats.total_sales_today, color: 'var(--accent)' },
-                        { label: 'WEEK_VOLUME', val: stats.total_sales_week, color: 'var(--info)' },
-                        { label: 'MONTH_VOLUME', val: stats.total_sales_month, color: 'var(--gold)' }
-                    ].map((item, i) => (
-                        <div key={i} className="card flex items-center justify-between group">
-                            <div>
-                                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>{item.label}</p>
-                                <p style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{item.val} <span style={{ fontSize: '0.9rem', color: 'var(--text-3)', fontWeight: 400 }}>UNITS</span></p>
-                            </div>
-                            <div
-                                style={{
-                                    width: '40px',
-                                    height: '40px',
-                                    backgroundColor: 'var(--bg-3)',
-                                    borderRadius: 'var(--radius)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    border: '1px solid var(--border)'
-                                }}
-                            >
-                                <ShoppingCart size={18} style={{ color: item.color }} />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Analytics & Alerts Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-                    {/* Best Selling Chart */}
-                    <div className="lg:col-span-2 card">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 style={{ fontSize: '1.25rem' }}>Top Performance</h3>
-                            <span className="badge badge-info">Units Sold</span>
-                        </div>
-                        <div style={{ width: '100%', height: '350px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={bestSellingData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: 'var(--text-3)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
-                                        dy={10}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: 'var(--text-3)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
-                                        itemStyle={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-                                        cursor={{ fill: 'var(--bg-3)' }}
-                                    />
-                                    <Bar dataKey="quantity" radius={[4, 4, 0, 0]}>
-                                        {bestSellingData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={index === 0 ? 'var(--accent)' : 'var(--bg-3)'} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Low Stock Sidebar */}
-                    <div className="card flex flex-col">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 style={{ fontSize: '1.25rem' }}>Critical Stock</h3>
-                            <AlertTriangle size={18} color="var(--danger)" />
-                        </div>
-
-                        <div className="flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: '350px' }}>
-                            {stats.low_stock_items.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full py-10 opacity-50">
-                                    <Package size={40} className="mb-4" />
-                                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>NOMINAL_LEVELS</p>
-                                </div>
-                            ) : (
-                                stats.low_stock_items.map((item) => (
-                                    <div key={item.id} className="p-4 rounded-[var(--radius)] bg-[var(--bg-3)] border border-[var(--border)] flex justify-between items-center group">
-                                        <div>
-                                            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.name}</p>
-                                            <p style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                                                QTY: {item.current_stock} / MIN: {item.low_stock_threshold}
-                                            </p>
-                                        </div>
-                                        <div
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                backgroundColor: 'var(--danger)',
-                                                boxShadow: '0 0 10px var(--danger)'
-                                            }}
-                                        />
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
-                        {stats.low_stock_items.length > 0 && (
-                            <button className="btn btn-outline w-full mt-auto pt-4" style={{ marginTop: '1.5rem' }}>
-                                VIEW_ALL_ALERTS
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Slow Moving Items Section */}
-                {stats.slow_moving_items.length > 0 && (
-                    <div className="card" style={{ borderLeft: '4px solid var(--gold)' }}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <Info size={20} color="var(--gold)" />
-                            <h3 style={{ fontSize: '1.25rem' }}>Optimization Insights</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {stats.slow_moving_items.map((item) => (
-                                <div key={item.name} className="p-4 bg-[var(--bg-3)] rounded-[var(--radius)] border border-[var(--border)]">
-                                    <p style={{ color: 'var(--text-2)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', marginBottom: '0.25rem' }}>SLOW_MOVING</p>
-                                    <p style={{ fontWeight: 700 }}>{item.name}</p>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--gold)', marginTop: '0.5rem' }}>
-                                        Only {item.quantity} sold this month
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Staff Activity Ledger - OWNER ONLY */}
-                {role === 'owner' && (
-                    <div className="card mt-10">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="flex items-center gap-3">
-                                <History size={20} color="var(--accent)" />
-                                <h3 style={{ fontSize: '1.25rem' }}>Staff Performance & Activity Ledger</h3>
-                            </div>
-                            <span className="badge badge-accent">Audit Ready</span>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>PRODUCT</th>
-                                        <th className="text-center">QTY</th>
-                                        <th className="text-right">TOTAL_VAL</th>
-                                        <th className="text-center">RECORDED_BY</th>
-                                        <th className="text-right">TIMESTAMP</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentSales.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-center py-10 opacity-50">
-                                                NO_RECENT_STAFF_ACTIVITY_FOUND
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        recentSales.map((sale) => (
-                                            <tr key={sale.id}>
-                                                <td>
-                                                    <span style={{ fontWeight: 700 }}>{sale.item_name}</span>
-                                                </td>
-                                                <td className="text-center">
-                                                    <span className="mono">{sale.quantity}</span>
-                                                </td>
-                                                <td className="text-right">
-                                                    <span className="mono" style={{ color: 'var(--accent)', fontWeight: 700 }}>
-                                                        {formatCurrency(sale.quantity * sale.selling_price)}
-                                                    </span>
-                                                </td>
-                                                <td className="text-center">
-                                                    <span className="badge badge-info text-[9px] py-0.5">
-                                                        {sale.recorded_by || 'ADMIN'}
-                                                    </span>
-                                                </td>
-                                                <td className="text-right">
-                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
-                                                        {new Date(sale.sale_date).toLocaleString()}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-            </main>
-        </div>
+      <div className="min-h-screen page-enter bg-[#0A0A0F]">
+        <Navbar />
+        <main className="app-main flex min-h-screen items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-white/45">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#6C63FF] border-t-transparent" />
+            <span className="text-sm">Loading dashboard</span>
+          </div>
+        </main>
+      </div>
     );
+  }
+
+  if (!stats) {
+    return (
+      <div className="min-h-screen page-enter bg-[#0A0A0F]">
+        <Navbar />
+        <main className="app-main">
+          <div className="card mx-auto max-w-xl py-14 text-center">
+            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-300/70" />
+            <h1 className="font-display text-2xl font-bold">Dashboard sync failed</h1>
+            <p className="mt-2 text-sm text-white/45">{errorMsg}</p>
+            <button onClick={loadStats} className="btn btn-primary mt-6">
+              <RefreshCcw size={16} />
+              Retry
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen page-enter bg-[#0A0A0F]">
+      <Navbar />
+      <main className="app-main">
+        <section className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="font-display text-4xl font-bold text-white md:text-5xl">{activeStore}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/45">
+              <Calendar size={16} className="text-[#b9b5ff]" />
+              {new Date().toLocaleDateString('en-NG', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              <span className={cn('badge ml-1', role === 'owner' ? 'badge-accent' : 'badge-info')}>
+                {role === 'owner' ? <UserCheck size={12} /> : <UserIcon size={12} />}
+                {role === 'owner' ? 'Owner' : (getWorkerProfile() || 'Worker')}
+              </span>
+            </div>
+          </div>
+          <button onClick={loadStats} className="btn btn-ghost self-start md:self-auto">
+            <RefreshCcw size={16} />
+            Refresh
+          </button>
+        </section>
+
+        <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard title="Today's Revenue" value={todayRevenue} icon={DollarSign} isCurrency tone="success" trend={{ value: 8.4, isPositive: true }} />
+          <StatCard title="Today's Profit" value={stats.daily_profit} icon={DollarSign} isCurrency tone="accent" trend={{ value: 4.2, isPositive: true }} />
+          <StatCard title="Sales Today" value={stats.total_sales_today} icon={ShoppingCart} tone="info" />
+          <button type="button" onClick={() => router.push('/stock')} className="text-left">
+            <StatCard title="Low Stock Items" value={stats.low_stock_items.length} icon={AlertTriangle} tone={stats.low_stock_items.length ? 'danger' : 'warn'} />
+          </button>
+        </section>
+
+        <section className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="card xl:col-span-2">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-xl font-bold">Weekly Profit</h2>
+                <p className="text-sm text-white/45">Fast read on current performance</p>
+              </div>
+              <span className="badge badge-accent">Naira</span>
+            </div>
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#8B8B9E', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#8B8B9E', fontSize: 12 }} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(108,99,255,0.08)' }}
+                    contentStyle={{ background: '#111118', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#F0F0F5' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Bar dataKey="profit" fill="#6C63FF" radius={[10, 10, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-xl font-bold">Low Stock Alerts</h2>
+              <AlertTriangle size={18} className="text-amber-300" />
+            </div>
+            <div className="space-y-3">
+              {stats.low_stock_items.length === 0 ? (
+                <div className="py-12 text-center text-white/35">
+                  <Package className="mx-auto mb-3 h-12 w-12 opacity-20" />
+                  No low stock items yet
+                </div>
+              ) : (
+                stats.low_stock_items.slice(0, 5).map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-white">{item.name}</p>
+                        <p className="mt-1 text-xs text-white/45">Stock {item.current_stock} / Threshold {item.low_stock_threshold}</p>
+                      </div>
+                      <button onClick={() => router.push('/stock')} className="btn btn-ghost px-3 py-2 text-xs">
+                        Restock
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-xl font-bold">Recent Sales</h2>
+              <p className="text-sm text-white/45">Last 10 sales recorded in the shop</p>
+            </div>
+            <span className="badge badge-info">Live</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th className="text-center">Qty</th>
+                  <th className="text-right">Price</th>
+                  <th>Time</th>
+                  <th>Recorded By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSales.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-white/35">No sales yet</td>
+                  </tr>
+                ) : (
+                  recentSales.map((sale) => (
+                    <tr key={sale.id}>
+                      <td className="font-medium text-white">{sale.item_name}</td>
+                      <td className="mono text-center">{sale.quantity}</td>
+                      <td className="mono text-right text-emerald-300">{formatCurrency(sale.quantity * sale.selling_price)}</td>
+                      <td>{formatDateTime(sale.sale_date)}</td>
+                      <td><span className="badge badge-info">{sale.recorded_by || 'Owner'}</span></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }

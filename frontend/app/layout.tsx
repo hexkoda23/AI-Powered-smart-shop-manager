@@ -1,11 +1,12 @@
 // Build trigger: Syncing latest fixes for deployment
 import type { Metadata } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { DM_Mono, DM_Sans, Syne } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-light' })
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-dark' })
+const syne = Syne({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-display' })
+const dmSans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500'], variable: '--font-body' })
+const dmMono = DM_Mono({ subsets: ['latin'], weight: ['300', '400', '500'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
   title: 'Notable AI Shop Assistant',
@@ -19,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <body className={`${syne.variable} ${dmSans.variable} ${dmMono.variable}`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

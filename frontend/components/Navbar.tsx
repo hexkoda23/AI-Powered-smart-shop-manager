@@ -3,23 +3,47 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ShoppingBag, BarChart3, Package, MessageSquare, Shield, User, Store, Lock as LockIcon, X, CheckCircle2, ShieldCheck, Key, Menu, Users } from 'lucide-react';
+import {
+  Bot,
+  CheckCircle2,
+  ChevronUp,
+  Key,
+  LayoutDashboard,
+  LogOut,
+  MoreHorizontal,
+  Package,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  UserCircle,
+  Users,
+  X,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getRole, setOwnerSession, getShopContext, setRole, clearAuth, getWorkerProfile } from '../lib/auth';
+import { clearAuth, getRole, getShopContext, getWorkerProfile, setOwnerSession, setRole } from '../lib/auth';
 import { authApi } from '../lib/api';
 
-const workerNav = [
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-  { href: '/sales', label: 'Record Sale', icon: ShoppingBag },
+const ownerNav = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/stock', label: 'Stock', icon: Package },
+  { href: '/sales', label: 'Sales', icon: ShoppingCart },
+  { href: '/customers', label: 'Owe Book', icon: Users },
+  { href: '/profiles', label: 'Profiles', icon: UserCircle },
+  { href: '/assistant', label: 'Assistant', icon: Bot },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-const ownerNav = [
-  { href: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-  { href: '/sales', label: 'Record Sale', icon: ShoppingBag },
+const workerNav = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/sales', label: 'Sales', icon: ShoppingCart },
+  { href: '/profiles', label: 'Profiles', icon: UserCircle },
+];
+
+const mobilePrimary = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/stock', label: 'Stock', icon: Package },
-  { href: '/customers', label: 'Customers', icon: User },
-  { href: '/assistant', label: 'AI Assistant', icon: MessageSquare },
-  { href: '/settings', label: 'Settings', icon: Shield },
+  { href: '/sales', label: 'Sales', icon: ShoppingCart },
+  { href: '/customers', label: 'Owe Book', icon: Users },
 ];
 
 export default function Navbar() {
@@ -34,37 +58,25 @@ export default function Navbar() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isPinSet, setIsPinSet] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [pathname]);
-
+  const isPublic = pathname === '/' || pathname === '/login' || pathname === '/register';
   const navItems = roleState === 'owner' ? ownerNav : workerNav;
-  const isLanding = pathname === '/';
 
   useEffect(() => {
+    setMoreOpen(false);
     const role = getRole();
     setRoleState(role);
-    const context = getShopContext();
-    setShopName(context.name);
-
-    // We should ideally fetch the latest shop info to know if PIN is set
-    // For now, we'll assume based on the login response which we should have stored
-    // or we fetch it here.
-    const storedPinSet = window.localStorage.getItem('notable_is_pin_set') === 'true';
-    setIsPinSet(storedPinSet);
-
-    const ownerPages = ['/stock', '/customers', '/assistant', '/settings'];
-    if (role === 'owner' && !ownerPages.some(p => pathname.startsWith(p)) && pathname !== '/dashboard') {
-      // Don't auto-clear if on dashboard or common pages
-    }
+    setShopName(getShopContext().name);
+    setIsPinSet(window.localStorage.getItem('notable_is_pin_set') === 'true');
   }, [pathname]);
+
+  if (isPublic) return null;
 
   const handleLogout = () => {
     clearAuth();
     window.localStorage.removeItem('notable_is_pin_set');
-    router.push('/');
+    router.push('/login');
     router.refresh();
   };
 
@@ -72,11 +84,7 @@ export default function Navbar() {
     setError('');
     setPin('');
     setConfirmPin('');
-    if (isPinSet) {
-      setElevationMode('verify');
-    } else {
-      setElevationMode('setup');
-    }
+    setElevationMode(isPinSet ? 'verify' : 'setup');
     setIsElevationModalOpen(true);
   };
 
@@ -89,28 +97,22 @@ export default function Navbar() {
       if (elevationMode === 'setup') {
         if (pin !== confirmPin) {
           setError('PINs do not match');
-          setLoading(false);
           return;
         }
         if (pin.length !== 4) {
           setError('PIN must be 4 digits');
-          setLoading(false);
           return;
         }
         await authApi.setOwnerPin(pin);
         window.localStorage.setItem('notable_is_pin_set', 'true');
         setIsPinSet(true);
-        setRole('owner');
-        setRoleState('owner');
-        setIsElevationModalOpen(false);
-        router.push('/dashboard');
       } else {
         await authApi.verifyOwnerPin(pin);
-        setRole('owner');
-        setRoleState('owner');
-        setIsElevationModalOpen(false);
-        router.push('/dashboard');
       }
+      setRole('owner');
+      setRoleState('owner');
+      setIsElevationModalOpen(false);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Authentication failed');
     } finally {
@@ -118,270 +120,189 @@ export default function Navbar() {
     }
   };
 
+  const roleLabel = roleState === 'owner' ? 'Owner' : (getWorkerProfile() || 'Worker');
+  const secondaryMobile = navItems.filter(item => !mobilePrimary.some(primary => primary.href === item.href));
+
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-[var(--bg)]/80 backdrop-blur-xl border-b border-[var(--border)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-4">
-                <Link href="/" className="flex items-center gap-2 group">
-                  <div className="w-3 h-3 bg-[var(--accent)] rounded-full shadow-[0_0_15px_rgba(0,229,160,0.4)] group-hover:scale-125 transition-transform" />
-                  <span className="font-display text-xl font-bold tracking-tight">NOTABLE</span>
-                </Link>
-
-                {shopName && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-2)]">
-                    <Store size={14} className="text-[var(--accent)]" />
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider">
-                      {shopName}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {roleState && !isLanding && (
-                <div className="hidden lg:flex items-center gap-1">
-                  {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                          isActive ? "bg-[var(--bg-3)] text-[var(--accent)]" : "text-[var(--text-3)] hover:text-white hover:bg-[var(--bg-2)]"
-                        )}
-                      >
-                        <Icon size={16} />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              {roleState && !isLanding && (
-                <div className="hidden sm:flex items-center gap-2 mr-2">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-widest border",
-                    roleState === 'owner' ? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20" : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
-                  )}>
-                    {roleState === 'owner' ? 'OWNER_MODE' : (getWorkerProfile()?.toUpperCase() || 'WORKER') + '_MODE'}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                {isLanding ? (
-                  <div className="flex items-center gap-3">
-                    <Link href="/login" className="px-5 py-2 hover:text-[var(--accent)] transition-colors text-sm font-bold">
-                      LOGIN
-                    </Link>
-                    <Link href={shopName ? "/login" : "/register"} className="flex items-center gap-2 px-6 py-2 bg-[var(--accent)] text-black rounded-xl text-sm font-bold hover:scale-[1.02] transition-all">
-                      GET_STARTED
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    <div className="hidden lg:flex items-center gap-3">
-                      {roleState === 'owner' ? (
-                        <button
-                          onClick={() => {
-                            setOwnerSession(false);
-                            setRoleState('worker');
-                            router.push('/dashboard');
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all"
-                        >
-                          <User size={16} />
-                          <span>{getWorkerProfile() || 'WORKER_VIEW'}</span>
-                        </button>
-                      ) : roleState === 'worker' ? (
-                        <button
-                          onClick={handleElevationClick}
-                          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-black rounded-xl text-sm font-bold hover:scale-[1.02] transition-all"
-                        >
-                          <ShieldCheck size={16} />
-                          <span>OWNER_PAGE</span>
-                        </button>
-                      ) : null}
-
-                      {roleState === 'worker' && (
-                        <button
-                          onClick={() => router.push('/profiles')}
-                          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all"
-                        >
-                          <Users size={16} />
-                          <span>SWITCH_PROFILE</span>
-                        </button>
-                      )}
-
-                      {roleState && (
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold text-[var(--text-3)] hover:text-[var(--danger)] hover:border-[var(--danger)]/20 transition-all"
-                        >
-                          <LockIcon size={16} />
-                          <span>LOGOUT</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Mobile Hamburger Toggle */}
-                    {roleState && (
-                      <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="lg:hidden p-2.5 rounded-xl bg-[var(--bg-2)] border border-[var(--border)] text-[var(--text-3)] hover:text-white transition-colors"
-                      >
-                        {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-white/[0.07] bg-[#0A0A0F]/90 p-5 backdrop-blur-xl md:flex md:flex-col">
+        <Link href="/dashboard" className="mb-8 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#6C63FF] shadow-[0_0_30px_rgba(108,99,255,0.35)]">
+            <Package className="h-5 w-5 text-white" />
           </div>
+          <div className="min-w-0">
+            <p className="font-display text-2xl font-bold leading-none text-white">Notable</p>
+            <p className="mt-1 truncate text-xs text-white/45">{shopName || 'Provision store'}</p>
+          </div>
+        </Link>
+
+        <div className="mb-6 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3">
+          <p className="truncate text-sm font-medium text-white">{shopName || 'Shop workspace'}</p>
+          <span className={cn('badge mt-2', roleState === 'owner' ? 'badge-accent' : 'badge-info')}>
+            {roleLabel}
+          </span>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-full px-4 py-3 text-sm font-medium transition-all',
+                  isActive ? 'bg-[#6C63FF] text-white shadow-[0_12px_28px_rgba(108,99,255,0.22)]' : 'text-white/50 hover:bg-white/[0.05] hover:text-white'
+                )}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="space-y-2 border-t border-white/[0.07] pt-4">
+          {roleState === 'owner' ? (
+            <button
+              onClick={() => {
+                setOwnerSession(false);
+                setRoleState('worker');
+                router.push('/dashboard');
+              }}
+              className="btn btn-ghost w-full justify-start"
+            >
+              <UserCircle size={18} />
+              Worker View
+            </button>
+          ) : (
+            <button onClick={handleElevationClick} className="btn btn-primary w-full justify-start">
+              <ShieldCheck size={18} />
+              Owner Mode
+            </button>
+          )}
+          <button onClick={handleLogout} className="btn btn-ghost w-full justify-start text-red-300 hover:text-red-200">
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#0A0A0F]/95 px-2 pb-2 pt-2 backdrop-blur-xl md:hidden">
+        <div className="grid grid-cols-5 gap-1">
+          {mobilePrimary.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            const disabledForWorker = roleState !== 'owner' && (item.href === '/stock' || item.href === '/customers');
+            return (
+              <Link
+                key={item.href}
+                href={disabledForWorker ? '/dashboard' : item.href}
+                className={cn(
+                  'flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium transition',
+                  isActive ? 'bg-[#6C63FF] text-white' : 'text-white/45'
+                )}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(!moreOpen)}
+            className={cn('flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium transition', moreOpen ? 'bg-white/10 text-white' : 'text-white/45')}
+          >
+            {moreOpen ? <ChevronUp size={18} /> : <MoreHorizontal size={18} />}
+            More
+          </button>
         </div>
       </nav>
 
-      {/* Mobile Nav Menu */}
-      {isMobileMenuOpen && roleState && !isLanding && (
-        <div className="lg:hidden fixed inset-x-0 top-20 bottom-0 z-40 bg-[var(--bg)]/95 backdrop-blur-3xl border-t border-[var(--border)] p-4 flex flex-col gap-2 overflow-y-auto animate-in slide-in-from-top-2 duration-200">
-          <div className="flex flex-col gap-1 mb-4">
-            {navItems.map((item) => {
+      {moreOpen && (
+        <div className="fixed inset-x-3 bottom-20 z-50 rounded-2xl border border-white/[0.08] bg-[#111118] p-3 shadow-2xl md:hidden">
+          <div className="mb-3 flex items-center justify-between border-b border-white/[0.07] pb-3">
+            <div>
+              <p className="text-sm font-medium">{shopName || 'Notable'}</p>
+              <span className={cn('badge mt-1', roleState === 'owner' ? 'badge-accent' : 'badge-info')}>{roleLabel}</span>
+            </div>
+            <button onClick={() => setMoreOpen(false)} className="rounded-full bg-white/5 p-2 text-white/50">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {secondaryMobile.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-4 rounded-xl text-base font-medium transition-all",
-                    isActive ? "bg-[var(--bg-3)] text-[var(--accent)]" : "text-[var(--text-3)] hover:text-white hover:bg-[var(--bg-2)]"
-                  )}
-                >
-                  <Icon size={20} />
+                <Link key={item.href} href={item.href} className="btn btn-ghost justify-start">
+                  <Icon size={16} />
                   {item.label}
                 </Link>
               );
             })}
-          </div>
-
-          <div className="mt-auto pt-4 border-t border-[var(--border)] flex flex-col gap-3">
-            <div className="flex items-center gap-2 px-2 mb-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-3)]">Current Mode</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-widest border",
-                roleState === 'owner' ? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20" : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
-              )}>
-                {roleState === 'owner' ? 'OWNER_MODE' : (getWorkerProfile()?.toUpperCase() || 'WORKER') + '_MODE'}
-              </span>
-            </div>
-
-            {roleState === 'owner' ? (
-              <button
-                onClick={() => {
-                  setOwnerSession(false);
-                  setRoleState('worker');
-                  router.push('/dashboard');
-                }}
-                className="flex items-center gap-3 px-4 py-3 bg-[var(--bg-2)] border border-[var(--border)] rounded-xl text-sm font-bold hover:bg-[var(--bg-3)] transition-all w-full justify-start text-white"
-              >
-                <User size={18} />
-                SWITCH TO {getWorkerProfile() || 'WORKER'} VIEW
+            {roleState === 'worker' && (
+              <button onClick={handleElevationClick} className="btn btn-primary justify-start">
+                <ShieldCheck size={16} />
+                Owner
               </button>
-            ) : roleState === 'worker' ? (
-              <button
-                onClick={handleElevationClick}
-                className="flex items-center gap-3 px-4 py-3 bg-[var(--accent)] text-black rounded-xl text-sm font-bold hover:scale-[1.02] transition-all w-full justify-start"
-              >
-                <ShieldCheck size={18} />
-                SWITCH TO OWNER PAGE
-              </button>
-            ) : null}
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm font-bold hover:bg-red-500/20 text-red-500 transition-all w-full justify-start mt-2"
-            >
-              <LockIcon size={18} />
-              LOGOUT
+            )}
+            <button onClick={handleLogout} className="btn btn-danger justify-start">
+              <LogOut size={16} />
+              Logout
             </button>
           </div>
         </div>
       )}
 
-      {/* Elevation Modal */}
       {isElevationModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-sm glass border border-[var(--border)] rounded-3xl p-8 relative shadow-2xl animate-in zoom-in-95 duration-300">
-            <button
-              onClick={() => setIsElevationModalOpen(false)}
-              className="absolute top-4 right-4 p-2 text-[var(--text-3)] hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-14 h-14 bg-[var(--accent)] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[var(--accent)]/20">
-                <Key className="w-7 h-7 text-black" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111118] p-6 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6C63FF]/15 text-[#b9b5ff]">
+                  <Key size={22} />
+                </div>
+                <h2 className="font-display text-2xl font-bold">{elevationMode === 'setup' ? 'Set Owner PIN' : 'Owner PIN'}</h2>
+                <p className="mt-1 text-sm text-white/45">
+                  {elevationMode === 'setup' ? 'Create a 4-digit PIN for sensitive actions.' : 'Enter your 4-digit PIN to continue.'}
+                </p>
               </div>
-              <h2 className="text-2xl font-bold">{elevationMode === 'setup' ? 'Set Owner PIN' : 'Owner Auth'}</h2>
-              <p className="text-[var(--text-3)] text-sm text-center mt-1">
-                {elevationMode === 'setup'
-                  ? 'First time elevating? Create a 4-digit PIN.'
-                  : 'Enter your 4-digit security PIN to proceed.'}
-              </p>
+              <button onClick={() => setIsElevationModalOpen(false)} className="rounded-full bg-white/5 p-2 text-white/50 hover:text-white">
+                <X size={18} />
+              </button>
             </div>
 
-            <form onSubmit={handleElevationSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-3)] ml-2">Secure PIN</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    placeholder="0000"
-                    required
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 text-center text-3xl tracking-[1em] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all"
-                    autoFocus
-                  />
-                </div>
-
-                {elevationMode === 'setup' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-3)] ml-2">Confirm PIN</label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="0000"
-                      required
-                      value={confirmPin}
-                      onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 text-center text-3xl tracking-[1em] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <div className="text-red-500 text-xs font-mono text-center bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                  {error.toString().toUpperCase()}
-                </div>
+            <form onSubmit={handleElevationSubmit} className="space-y-4">
+              <input
+                type="password"
+                maxLength={4}
+                placeholder="0000"
+                required
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                className="input w-full text-center font-mono text-3xl tracking-[0.8em]"
+                autoFocus
+              />
+              {elevationMode === 'setup' && (
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="0000"
+                  required
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                  className="input w-full text-center font-mono text-3xl tracking-[0.8em]"
+                />
               )}
-
+              {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
               <button
                 type="submit"
-                disabled={loading || (elevationMode === 'setup' ? pin.length !== 4 || confirmPin.length !== 4 : pin.length !== 4)}
-                className="w-full py-4 bg-[var(--accent)] text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-[var(--accent)]/30 uppercase tracking-widest"
+                disabled={loading || pin.length !== 4 || (elevationMode === 'setup' && confirmPin.length !== 4)}
+                className="btn btn-primary w-full"
               >
-                {loading ? 'PROCESSING...' : (elevationMode === 'setup' ? 'INITIALIZE_OWNER' : 'AUTHORIZE_ELEVATION')}
+                {loading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <CheckCircle2 size={18} />}
+                Continue
               </button>
             </form>
           </div>

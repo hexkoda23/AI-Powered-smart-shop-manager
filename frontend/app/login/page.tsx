@@ -1,142 +1,115 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Eye, EyeOff, Lock, Store } from 'lucide-react';
 import { setOwnerSession, getRole, setShopContext, setRole, getShopContext } from '../../lib/auth';
 import { authApi } from '../../lib/api';
-import { Lock, Store, ArrowLeft, Eye, EyeOff, ShoppingBag } from 'lucide-react';
-import Link from 'next/link';
 
 export default function LoginPage() {
-    const router = useRouter();
-    const [name, setName] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState<string>('');
-    const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const [name, setName] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const context = getShopContext();
-        // Only redirect if there is a real authenticated session (shop ID exists)
-        if (context.id && getRole()) {
-            router.push('/dashboard');
-        }
-    }, [router]);
+  useEffect(() => {
+    const context = getShopContext();
+    if (context.id && getRole()) router.push('/dashboard');
+  }, [router]);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!name || !password) {
-            setError('Please enter store name and password');
-            return;
-        }
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !password) {
+      setError('Please enter store name and password');
+      return;
+    }
 
-        setLoading(true);
-        setError('');
+    setLoading(true);
+    setError('');
 
-        try {
-            const shop = await authApi.login(name, password);
-            setShopContext(shop.id, shop.name);
-            window.localStorage.setItem('notable_is_pin_set', shop.is_pin_set.toString());
-            setRole('worker'); // Standard login enters as worker
-            setOwnerSession(false);
-            router.push('/profiles');
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'INVALID_CREDENTIALS');
-            setLoading(false);
-        }
-    };
+    try {
+      const shop = await authApi.login(name, password);
+      setShopContext(shop.id, shop.name);
+      window.localStorage.setItem('notable_is_pin_set', shop.is_pin_set.toString());
+      setRole('worker');
+      setOwnerSession(false);
+      router.push('/profiles');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Invalid credentials');
+      setLoading(false);
+    }
+  };
 
-    return (
-        <div className="min-h-screen bg-[#07080a] text-white flex flex-col relative overflow-hidden selection:bg-[var(--accent)] selection:text-black">
-            <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full pointer-events-none" />
-
-            <header className="p-8 relative z-10">
-                <Link href="/" className="flex items-center gap-2 group w-fit">
-                    <ArrowLeft size={20} className="text-[var(--text-3)] group-hover:text-[var(--accent)] transition-colors" />
-                    <span className="text-xs font-mono text-[var(--text-3)] group-hover:text-white transition-colors uppercase tracking-widest">RETURN_TO_WEB</span>
-                </Link>
-            </header>
-
-            <main className="flex-1 flex flex-col items-center justify-center p-4 relative z-10">
-                <div className="w-full max-w-md">
-                    <div className="text-center mb-8">
-                        <div className="relative inline-block mb-4 group">
-                            <div className="absolute inset-0 bg-[var(--accent)] blur-[25px] opacity-10" />
-                            <div className="w-16 h-16 rounded-2xl bg-[var(--bg-2)] border border-[var(--border)] flex items-center justify-center relative">
-                                <ShoppingBag size={28} color="var(--accent)" />
-                                {loading && (
-                                    <div className="absolute inset-0 border-2 border-[var(--accent)] border-t-transparent rounded-2xl animate-spin" />
-                                )}
-                            </div>
-                        </div>
-                        <h1 className="text-3xl font-bold mb-1 tracking-tight">Access Store</h1>
-                        <p className="text-[var(--text-3)] text-xs font-mono tracking-widest uppercase">Worker_Authentication_v2.0</p>
-                    </div>
-
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="space-y-4">
-                            <div className="relative">
-                                <Store className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-3)]" />
-                                <input
-                                    type="text"
-                                    placeholder="Business Name"
-                                    required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-[var(--text-1)]"
-                                />
-                            </div>
-
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-3)]" />
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Enter Password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-2xl py-4 pl-12 pr-12 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all text-[var(--text-1)]"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-3)] hover:text-white transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-4 rounded-2xl text-sm flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 bg-red-500 rounded-full shrink-0" />
-                                {error}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading || !name || !password}
-                            className="w-full py-4 bg-[var(--accent)] text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest"
-                        >
-                            {loading ? 'AUTHENTICATING...' : 'AUTHORIZE_WORKER'}
-                        </button>
-                    </form>
-
-                    <p className="mt-8 text-center text-[var(--text-3)] text-sm">
-                        New business?{' '}
-                        <Link href="/register" className="text-[var(--accent)] font-semibold hover:underline">
-                            Initialize Store
-                        </Link>
-                    </p>
-                </div>
-            </main>
-
-            <footer className="p-8 text-center relative z-10">
-                <p className="text-[var(--text-3)] text-[8px] font-mono opacity-50 uppercase tracking-[0.3em]">
-                    Notable_Auth_Kernal_Active
-                </p>
-            </footer>
+  return (
+    <main className="min-h-screen overflow-hidden bg-[#0A0A0F] px-4 py-8 text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(108,99,255,0.22),transparent_32rem)]" />
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.04] shadow-[0_0_40px_rgba(108,99,255,0.18)]">
+            <Store className="h-7 w-7 text-[#b9b5ff]" />
+          </div>
+          <h1 className="font-display text-5xl font-extrabold tracking-normal">Notable</h1>
+          <p className="mt-2 text-lg text-white/55">Your shop. Simplified.</p>
+          <p className="mt-5 rounded-full border border-white/[0.07] bg-white/[0.04] px-4 py-2 text-sm text-white/55">
+            Built for {name || 'your'} provision store
+          </p>
         </div>
-    );
+
+        <form onSubmit={handleLogin} className="glass space-y-5 p-6">
+          <div>
+            <label className="mb-2 block text-sm text-white/55">Shop name</label>
+            <div className="relative">
+              <Store className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
+              <input
+                type="text"
+                placeholder="Mama Tola Stores"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input w-full pl-12"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm text-white/55">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input w-full pl-12 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 hover:text-white"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+
+          <button type="submit" disabled={loading || !name || !password} className="btn btn-primary w-full bg-gradient-to-r from-[#6C63FF] to-[#8B7CFF] py-3">
+            {loading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 'Sign in'}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-white/45">
+          New business?{' '}
+          <Link href="/register" className="font-medium text-[#b9b5ff] hover:text-white">
+            Create your shop
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
 }

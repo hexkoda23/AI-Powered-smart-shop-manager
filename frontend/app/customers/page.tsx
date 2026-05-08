@@ -134,7 +134,7 @@ export default function CustomersPage() {
                         <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                             <User size={24} color="var(--accent)" />
                         </div>
-                        <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>CRMs & Debt</h1>
+                        <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Owe Book</h1>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -162,16 +162,16 @@ export default function CustomersPage() {
                 {/* Overview Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     <div className="card">
-                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>TOTAL_RECEIVABLES</p>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>TOTAL_CUSTOMERS</p>
+                        <p style={{ fontSize: '2rem', fontWeight: 800 }}>{customers.length}</p>
+                    </div>
+                    <div className="card">
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>TOTAL_OUTSTANDING_DEBT</p>
                         <p style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(totalReceivables)}</p>
                     </div>
                     <div className="card">
-                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>ACTIVE_DEBTORS</p>
-                        <p style={{ fontSize: '2rem', fontWeight: 800 }}>{customers.filter(c => c.total_debt > 0).length}</p>
-                    </div>
-                    <div className="card">
-                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>CUSTOMER_BASE</p>
-                        <p style={{ fontSize: '2rem', fontWeight: 800 }}>{customers.length}</p>
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>CUSTOMERS_OVER_LIMIT</p>
+                        <p style={{ fontSize: '2rem', fontWeight: 800 }}>{customers.filter(c => c.total_debt > c.credit_limit).length}</p>
                     </div>
                 </div>
 
@@ -194,10 +194,11 @@ export default function CustomersPage() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>CUSTOMER_IDENTITY</th>
-                                    <th>CONTACT_INFO</th>
-                                    <th className="text-right">OUTSTANDING</th>
-                                    <th className="text-right">RISK</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th className="text-right">Total Debt</th>
+                                    <th className="text-right">Credit Limit</th>
+                                    <th className="text-right">Status</th>
                                     <th className="text-right">MGMT</th>
                                 </tr>
                             </thead>
@@ -205,6 +206,7 @@ export default function CustomersPage() {
                                 {filteredCustomers.map(customer => {
                                     const usage = customer.total_debt / customer.credit_limit;
                                     const isHighRisk = usage > 0.8;
+                                    const isOverLimit = customer.total_debt > customer.credit_limit;
                                     return (
                                         <tr key={customer.id}>
                                             <td>
@@ -214,23 +216,20 @@ export default function CustomersPage() {
                                                 </div>
                                             </td>
                                             <td>
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2 opacity-70">
-                                                        <Phone size={12} />
-                                                        <span style={{ fontSize: '0.8rem' }}>{customer.phone}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 opacity-70">
-                                                        <MapPin size={12} />
-                                                        <span style={{ fontSize: '0.8rem' }}>{customer.address}</span>
-                                                    </div>
+                                                <div className="flex items-center gap-2 opacity-70">
+                                                    <Phone size={12} />
+                                                    <span style={{ fontSize: '0.8rem' }}>{customer.phone || 'No phone'}</span>
                                                 </div>
                                             </td>
                                             <td className="text-right mono font-bold" style={{ color: customer.total_debt > 0 ? 'var(--danger)' : 'inherit' }}>
                                                 {formatCurrency(customer.total_debt)}
                                             </td>
                                             <td className="text-right">
-                                                <span className={cn("badge", isHighRisk ? "badge-danger" : customer.total_debt > 0 ? "badge-info" : "badge-accent")}>
-                                                    {isHighRisk ? 'HIGH_RISK' : customer.total_debt > 0 ? 'DEBTOR' : 'CLEAR'}
+                                                <span className="mono">{formatCurrency(customer.credit_limit)}</span>
+                                            </td>
+                                            <td className="text-right">
+                                                <span className={cn("badge", isOverLimit ? "badge-danger" : isHighRisk ? "badge-warn" : "badge-success")}>
+                                                    {isOverLimit ? 'Over Limit' : isHighRisk ? 'Near Limit' : 'OK'}
                                                 </span>
                                             </td>
                                             <td className="text-right">
@@ -244,6 +243,8 @@ export default function CustomersPage() {
                                                     </button>
                                                     <button
                                                         title="Log Payment"
+                                                        onClick={() => { setSelectedCustomer(customer); setModalType('payment'); setShowModal(true); }}
+                                                        className="btn btn-outline p-1.5"
                                                     >
                                                         <DollarSign size={14} color="var(--accent)" />
                                                     </button>

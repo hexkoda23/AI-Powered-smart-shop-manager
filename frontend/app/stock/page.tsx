@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { itemsApi, aiApi, Item, DeepInsight } from '../../lib/api';
-import { Plus, Edit2, Trash2, Package, X, Save, TrendingUp, Info, Zap, Copy, Check, Upload, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, X, Save, TrendingUp, Info, Zap, Copy, Check, Upload, Download, Search } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
 import { UserCheck, User as UserIcon } from 'lucide-react';
@@ -26,6 +26,8 @@ export default function StockPage() {
   const [csvError, setCsvError] = useState('');
   const [csvResult, setCsvResult] = useState<{ created: number; skipped: number } | null>(null);
   const [csvImporting, setCsvImporting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -181,6 +183,14 @@ export default function StockPage() {
   };
 
   const highRiskItems = insights.filter(i => i.restock_score >= 70).slice(0, 3);
+  const visibleItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter =
+      stockFilter === 'all' ||
+      (stockFilter === 'low' && item.current_stock > 0 && item.current_stock <= item.low_stock_threshold) ||
+      (stockFilter === 'out' && item.current_stock === 0);
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="min-h-screen page-enter" style={{ backgroundColor: 'var(--bg)' }}>
@@ -192,7 +202,7 @@ export default function StockPage() {
             <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
               <Package size={24} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Inventory</h1>
+            <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Stock Inventory</h1>
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
@@ -216,7 +226,7 @@ export default function StockPage() {
               style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
             >
               <Upload size={16} />
-              BULK_IMPORT
+              CSV Import
             </button>
 
             <button
@@ -224,9 +234,103 @@ export default function StockPage() {
               className="btn btn-primary"
             >
               <Plus size={18} />
-              NEW_ITEM
+              Add Item
             </button>
           </div>
+        </div>
+
+        <div className="card mb-8">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search inventory..."
+                className="input w-full pl-11"
+              />
+            </div>
+            <select
+              value={stockFilter}
+              onChange={(event) => setStockFilter(event.target.value as 'all' | 'low' | 'out')}
+              className="input min-w-[180px]"
+            >
+              <option value="all">All stock</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Stock List Card */}
+        <div className="card flex flex-col min-h-[600px] mb-10">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <span className="badge badge-info">Stock Inventory</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>TOTAL_SKUS: {items.length}</span>
+            </div>
+          </div>
+
+          {visibleItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center flex-1 opacity-30 gap-4">
+              <Package size={48} />
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>No inventory items yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th className="text-right">Cost Price</th>
+                    <th className="text-right">Selling Price</th>
+                    <th className="text-center">Stock</th>
+                    <th className="text-center">Threshold</th>
+                    <th className="text-right">Margin %</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleItems.map((item) => {
+                    const isOut = item.current_stock === 0;
+                    const isLow = item.current_stock <= item.low_stock_threshold;
+                    const margin = item.selling_price ? ((item.selling_price - item.cost_price) / item.selling_price) * 100 : 0;
+                    return (
+                      <tr key={item.id}>
+                        <td><span style={{ fontWeight: 700 }}>{item.name}</span></td>
+                        <td className="text-right mono">{formatCurrency(item.cost_price)}</td>
+                        <td className="text-right mono">{formatCurrency(item.selling_price)}</td>
+                        <td className="text-center">
+                          <span className={cn("badge", isOut ? "badge-danger" : isLow ? "badge-warn" : "badge-success")}>
+                            {isOut ? 'Out' : isLow ? `Low: ${item.current_stock}` : `OK: ${item.current_stock}`}
+                          </span>
+                        </td>
+                        <td className="text-center mono">{item.low_stock_threshold}</td>
+                        <td className="text-right">
+                          <span className={cn("mono font-bold", margin > 20 ? "text-emerald-300" : margin >= 10 ? "text-amber-300" : "text-red-300")}>
+                            {margin.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleOpenModal('edit', item)} className="btn btn-outline p-2" title="Edit Item">
+                              <Edit2 size={14} />
+                            </button>
+                            <button onClick={() => handleOpenModal('restock', item)} className="btn btn-outline p-2" title="Restock">
+                              <Plus size={14} className="text-emerald-300" />
+                            </button>
+                            <button onClick={() => handleDelete(item.id)} className="btn btn-danger p-2" title="Delete Item">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* AI Insights Panel */}
@@ -311,7 +415,8 @@ export default function StockPage() {
           </div>
         )}
 
-        {/* Stock List Card */}
+        <div className="hidden">
+        {/* Legacy Stock List Card */}
         <div className="card flex flex-col min-h-[600px]">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -406,6 +511,7 @@ export default function StockPage() {
               </table>
             </div>
           )}
+        </div>
         </div>
       </main>
 

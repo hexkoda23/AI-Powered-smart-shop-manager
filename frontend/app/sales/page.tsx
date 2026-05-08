@@ -32,6 +32,7 @@ export default function SalesPage() {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
   const [editingSaleId, setEditingSaleId] = useState<number | null>(null);
+  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'custom'>('today');
 
   useEffect(() => {
     loadData();
@@ -216,6 +217,19 @@ export default function SalesPage() {
   };
 
   const selectedItem = items.find(i => i.name === formData.item_name) || null;
+  const periodSales = recentSales.filter((sale) => {
+    const saleDate = new Date(sale.sale_date);
+    const now = new Date();
+    if (period === 'today') return saleDate.toDateString() === now.toDateString();
+    if (period === 'week') return now.getTime() - saleDate.getTime() <= 7 * 24 * 60 * 60 * 1000;
+    if (period === 'month') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+    return true;
+  });
+  const summaryRevenue = periodSales.reduce((sum, sale) => sum + sale.quantity * sale.selling_price, 0);
+  const summaryProfit = periodSales.reduce((sum, sale) => {
+    const item = items.find(i => i.name === sale.item_name);
+    return sum + sale.quantity * (sale.selling_price - (item?.cost_price || 0));
+  }, 0);
 
   return (
     <div className="min-h-screen page-enter" style={{ backgroundColor: 'var(--bg)' }}>
@@ -227,7 +241,7 @@ export default function SalesPage() {
             <div style={{ padding: '0.75rem', backgroundColor: 'var(--accent-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
               <ShoppingBag size={24} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Point of Sale</h1>
+            <h1 style={{ fontSize: '2.5rem', lineHeight: 1 }}>Sales</h1>
           </div>
 
           {role && (
@@ -243,6 +257,39 @@ export default function SalesPage() {
               </span>
             </div>
           )}
+        </div>
+
+        <div className="mb-6 flex flex-wrap gap-2">
+          {[
+            ['today', 'Today'],
+            ['week', 'This Week'],
+            ['month', 'This Month'],
+            ['custom', 'Custom Range'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setPeriod(value as 'today' | 'week' | 'month' | 'custom')}
+              className={cn('btn px-4 py-2', period === value ? 'btn-primary' : 'btn-ghost')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="card">
+            <p className="text-sm text-white/45">Total revenue</p>
+            <p className="mono mt-2 text-2xl text-emerald-300">{formatCurrency(summaryRevenue)}</p>
+          </div>
+          <div className="card">
+            <p className="text-sm text-white/45">Total profit</p>
+            <p className="mono mt-2 text-2xl text-[#b9b5ff]">{formatCurrency(summaryProfit)}</p>
+          </div>
+          <div className="card">
+            <p className="text-sm text-white/45">Number of sales</p>
+            <p className="mono mt-2 text-2xl">{periodSales.length}</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -497,22 +544,28 @@ export default function SalesPage() {
                         </td>
                         <td className="text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditClick(sale)}
-                              className="p-1.5 rounded-md hover:bg-[var(--accent)] hover:text-black text-[var(--text-3)] transition-colors"
-                              title="Edit Sale"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteClick(sale.id)}
-                              className="p-1.5 rounded-md hover:bg-[var(--danger)] hover:text-white text-[var(--text-3)] transition-colors"
-                              title="Delete Sale"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {role === 'owner' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditClick(sale)}
+                                  className="p-1.5 rounded-md hover:bg-[var(--accent)] hover:text-white text-[var(--text-3)] transition-colors"
+                                  title="Edit Sale"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteClick(sale.id)}
+                                  className="p-1.5 rounded-md hover:bg-[var(--danger)] hover:text-white text-[var(--text-3)] transition-colors"
+                                  title="Delete Sale"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-white/30">Owner only</span>
+                            )}
                           </div>
                         </td>
                       </tr>
