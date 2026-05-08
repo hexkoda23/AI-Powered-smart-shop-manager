@@ -37,6 +37,97 @@ class AIService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _local_analysis(self, message: str, shop_id: int) -> dict:
+        from app.models import Item, Sale
+
+        normalized = message.lower()
+        items = self.db.query(Item).filter(Item.shop_id == shop_id).all()
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        sales = self.db.query(Sale).filter(
+            Sale.shop_id == shop_id,
+            Sale.sale_date >= thirty_days_ago
+        ).all()
+
+        if not items:
+            return {
+                "response": "I do not see any stock items yet. Add products and a few sales first, then I can spot slow movers, restock needs, and profit trends.",
+                "insights": [],
+                "recommendations": ["Add your main products in Stock.", "Record daily sales so the assistant can learn your shop pattern."]
+            }
+
+        sales_by_item: Dict[int, int] = {}
+        revenue_by_item: Dict[int, float] = {}
+        profit_by_item: Dict[int, float] = {}
+        item_lookup = {item.id: item for item in items}
+
+        for sale in sales:
+            item = item_lookup.get(sale.item_id)
+            if not item:
+                continue
+            sales_by_item[item.id] = sales_by_item.get(item.id, 0) + sale.quantity
+            revenue_by_item[item.id] = revenue_by_item.get(item.id, 0) + (sale.quantity * sale.selling_price)
+            profit_by_item[item.id] = profit_by_item.get(item.id, 0) + (sale.quantity * (sale.selling_price - item.cost_price))
+
+        if "slow" in normalized or "moving" in normalized:
+            ranked = sorted(items, key=lambda item: (sales_by_item.get(item.id, 0), -item.current_stock))[:5]
+            lines = [
+                f"{item.name}: {sales_by_item.get(item.id, 0)} sold in 30 days, {item.current_stock} in stock"
+                for item in ranked
+            ]
+            return {
+                "response": "These items are moving slowly based on the last 30 days of sales:\n\n" + "\n".join(lines),
+                "insights": lines,
+                "recommendations": [
+                    "Avoid restocking these items until current stock reduces.",
+                    "Try a small bundle, discount, or front-shelf placement for the highest-stock slow movers."
+                ]
+            }
+
+        if "revenue" in normalized or "top" in normalized or "driver" in normalized:
+            ranked = sorted(items, key=lambda item: revenue_by_item.get(item.id, 0), reverse=True)[:5]
+            lines = [
+                f"{item.name}: revenue {revenue_by_item.get(item.id, 0):,.0f}, quantity sold {sales_by_item.get(item.id, 0)}"
+                for item in ranked
+            ]
+            return {
+                "response": "Your top revenue drivers for the last 30 days are:\n\n" + "\n".join(lines),
+                "insights": lines,
+                "recommendations": ["Keep these products visible and stocked.", "Check their margins before running discounts."]
+            }
+
+        if "profit" in normalized or "trajectory" in normalized:
+            total_profit = sum(profit_by_item.values())
+            total_revenue = sum(revenue_by_item.values())
+            margin = (total_profit / total_revenue * 100) if total_revenue else 0
+            return {
+                "response": f"Estimated 30-day profit is {total_profit:,.0f} from {total_revenue:,.0f} revenue. That is about a {margin:.1f}% gross margin.",
+                "insights": [
+                    f"30-day revenue: {total_revenue:,.0f}",
+                    f"30-day gross profit: {total_profit:,.0f}",
+                    f"Gross margin: {margin:.1f}%"
+                ],
+                "recommendations": ["Focus on high-margin fast sellers.", "Review cost prices for items with weak profit contribution."]
+            }
+
+        insights = self.get_deep_insights(shop_id)
+        urgent = [insight for insight in insights if insight["restock_score"] >= 70][:5]
+        if urgent:
+            lines = [
+                f"{item['name']}: about {item['days_remaining']} days left, restock {item['suggested_restock_qty']}"
+                for item in urgent
+            ]
+            return {
+                "response": "These items need restock attention:\n\n" + "\n".join(lines),
+                "insights": lines,
+                "recommendations": ["Restock the highest-score items first.", "Use the suggested quantities as a starting point, then adjust for available cash."]
+            }
+
+        return {
+            "response": "Your stock looks stable from the data I can see. Keep recording sales and I will give sharper restock, profit, and slow-moving item advice.",
+            "insights": ["No urgent restock items found right now."],
+            "recommendations": ["Record sales daily for better predictions."]
+        }
+
     def _get_shop_context(self, shop_id: int) -> str:
         from app.models import Item, Sale
         items = self.db.query(Item).filter(Item.shop_id == shop_id).all()
@@ -89,11 +180,7 @@ class AIService:
     def chat(self, message: str, shop_id: int, context: Optional[dict] = None) -> dict:
         client = _get_groq_client()
         if not client:
-            return {
-                "response": "AI service is currently unavailable. Please set the GROQ_API_KEY environment variable in your Railway dashboard (or .env file for local development).",
-                "insights": [],
-                "recommendations": []
-            }
+            return self._local_analysis(message, shop_id)
 
         shop_context = self._get_shop_context(shop_id)
         system_prompt = f"""You are Notable, an AI assistant for a Nigerian provision shop management system.
