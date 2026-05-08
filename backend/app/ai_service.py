@@ -8,8 +8,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-groq_api_key = os.getenv("GROQ_API_KEY") or os.getenv("notable")
-client = Groq(api_key=groq_api_key) if groq_api_key else None
+def _get_groq_api_key() -> Optional[str]:
+    for name in ("GROQ_API_KEY", "GROQ_KEY"):
+        value = os.getenv(name)
+        if value and value.strip() and "your_groq_api_key_here" not in value.lower():
+            return value.strip()
+    return None
+
+
+def _get_groq_client() -> Optional[Groq]:
+    groq_api_key = _get_groq_api_key()
+    return Groq(api_key=groq_api_key) if groq_api_key else None
 
 
 class AIService:
@@ -66,9 +75,10 @@ class AIService:
         return " ".join(context_parts)
 
     def chat(self, message: str, shop_id: int, context: Optional[dict] = None) -> dict:
+        client = _get_groq_client()
         if not client:
             return {
-                "response": "AI service is currently unavailable. Please set the GROQ API key.",
+                "response": "AI service is currently unavailable. Please set the GROQ_API_KEY environment variable in your Railway dashboard (or .env file for local development).",
                 "insights": [],
                 "recommendations": []
             }

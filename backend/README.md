@@ -14,9 +14,9 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-3. Add your OpenAI API key to `.env`:
+3. Add your Groq API key to `.env`:
 ```
-OPENAI_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
 ```
 
 4. Run the server:
