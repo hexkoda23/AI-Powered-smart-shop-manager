@@ -1,4 +1,6 @@
 import os
+import logging
+from pathlib import Path
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
@@ -6,13 +8,23 @@ from groq import Groq
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly load .env from the backend root (two levels up from this file)
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
+else:
+    load_dotenv()
+
+logger = logging.getLogger(__name__)
+
 
 def _get_groq_api_key() -> Optional[str]:
     for name in ("GROQ_API_KEY", "GROQ_KEY"):
         value = os.getenv(name)
         if value and value.strip() and "your_groq_api_key_here" not in value.lower():
+            logger.info(f"GROQ API key found from env var: {name}")
             return value.strip()
+    logger.warning("No GROQ_API_KEY or GROQ_KEY environment variable found.")
     return None
 
 
