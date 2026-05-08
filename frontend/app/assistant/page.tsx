@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import { aiApi } from '../../lib/api';
-import { Send, Bot, User, Sparkles, TrendingUp, Package, Zap, MessageSquare } from 'lucide-react';
+import { Send, Bot, Sparkles, TrendingUp, Zap, MessageSquare, Loader2, Wifi } from 'lucide-react';
 import { isOwnerSessionValid, getRole, Role } from '../../lib/auth';
 import { cn } from '../../lib/utils';
 import { UserCheck, User as UserIcon } from 'lucide-react';
@@ -21,7 +21,7 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "SYSTEM_INITIALIZED: Notable AI v1.0\n\nI am your strategic shop assistant. I have mapped your current inventory and sales trajectory. How can I optimize your operations today?",
+      content: "Hi, I am Notable. Ask me what to restock, what is selling well, what is slowing down, or how your profit is moving.",
     },
   ]);
   const [input, setInput] = useState('');
@@ -70,7 +70,7 @@ export default function AssistantPage() {
         ...prev,
         {
           role: 'assistant',
-          content: 'ERR_LLM_TIMEOUT: Please verify your connection or API configuration.',
+          content: 'I could not reach the assistant service just now. Please check that the backend is running, then try again.',
         },
       ]);
     } finally {
@@ -79,9 +79,9 @@ export default function AssistantPage() {
   };
 
   const quickQuestions = [
-    "Predict restock needs",
-    "Identify top 5 revenue drivers",
-    "Analyze monthly profit trajectory",
+    "What should I restock?",
+    "Show my top 5 revenue drivers",
+    "Analyze my monthly profit",
     "Detect slow-moving inventory",
   ];
 
@@ -89,55 +89,58 @@ export default function AssistantPage() {
     <div className="min-h-screen page-enter flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
       <Navbar />
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex flex-col gap-8 h-[calc(100vh-80px)]">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-10 flex flex-col gap-6 min-h-[calc(100vh-80px)]">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div style={{ padding: '0.75rem', backgroundColor: 'var(--accent-dim)', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
               <Bot size={24} color="var(--accent)" />
             </div>
             <div>
-              <h1 style={{ fontSize: '2rem', lineHeight: 1 }}>Neural Advisor</h1>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginTop: '0.25rem' }}>MODE: STRATEGIC_ANALYSIS</p>
+              <h1 className="text-2xl md:text-3xl leading-tight">Shop Assistant</h1>
+              <p className="mt-1 max-w-xl text-sm text-[var(--text-2)]">
+                Get practical answers from your stock and sales records.
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             {role && (
               <div className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-2xl border animate-in zoom-in duration-500",
+                "flex items-center gap-2 px-3 py-2 rounded-xl border animate-in zoom-in duration-500",
                 role === 'owner'
                   ? "bg-[var(--accent)]/10 border-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_20px_rgba(0,229,160,0.1)]"
                   : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--info)] shadow-[0_0_20px_rgba(0,149,255,0.1)]"
               )}>
                 {role === 'owner' ? <UserCheck size={16} /> : <UserIcon size={16} />}
                 <span className="font-display font-bold tracking-widest text-xs uppercase">
-                  {role === 'owner' ? 'Owner' : 'Worker'} Page
+                  {role === 'owner' ? 'Owner' : 'Worker'}
                 </span>
               </div>
             )}
 
-            <div className="hidden md:flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
               <div
                 style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)', animation: 'pulse 2s infinite' }}
               />
-              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-2)' }}>SYSTEM_READY</span>
+              <span className="text-xs font-medium text-[var(--text-2)]">Ready</span>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col lg:flex-row gap-8 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-6 min-h-0">
 
           {/* Chat Pane */}
-          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+          <div className="flex min-h-[620px] flex-col gap-4 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#111118]/70 p-4 shadow-2xl shadow-black/20">
             {/* Quick Prompts */}
-            <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <div className="flex flex-wrap gap-2">
               {quickQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(undefined, q)}
-                  className="btn btn-outline whitespace-nowrap text-xs py-2 px-3 border-dashed"
+                  disabled={loading}
+                  className="btn btn-outline whitespace-nowrap text-xs py-2 px-3"
                 >
                   <Zap size={12} color="var(--accent)" />
                   {q}
@@ -147,23 +150,23 @@ export default function AssistantPage() {
 
             {/* Messages Container */}
             <div
-              className="flex-1 overflow-y-auto pr-4 space-y-6 scrollbar-thin scrollbar-thumb-[var(--border)]"
+              className="custom-scrollbar flex-1 overflow-y-auto pr-1 md:pr-3 space-y-5"
             >
               {messages.map((msg, i) => (
                 <div key={i} className={cn("flex flex-col gap-2", msg.role === 'user' ? "items-end" : "items-start")}>
-                  <div className="flex items-center gap-2 mb-1 px-1">
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>
-                      {msg.role === 'user' ? 'USER_PROMPT' : 'ASSISTANT_RELAY'}
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="text-xs font-medium text-[var(--text-3)]">
+                      {msg.role === 'user' ? 'You' : 'Notable'}
                     </span>
                   </div>
                   <div
-                    className="card"
+                    className="border shadow-lg shadow-black/10"
                     style={{
                       backgroundColor: msg.role === 'user' ? 'var(--bg-3)' : 'var(--bg-2)',
                       border: msg.role === 'user' ? '1px solid var(--accent-dim)' : '1px solid var(--border)',
                       padding: '1rem 1.25rem',
-                      maxWidth: '85%',
-                      borderRadius: msg.role === 'user' ? '18px 4px 18px 18px' : '4px 18px 18px 18px'
+                      maxWidth: 'min(92%, 720px)',
+                      borderRadius: msg.role === 'user' ? '16px 6px 16px 16px' : '6px 16px 16px 16px'
                     }}
                   >
                     <p style={{ fontSize: '0.95rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.content}</p>
@@ -175,7 +178,7 @@ export default function AssistantPage() {
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-[var(--info)]">
                               <TrendingUp size={14} />
-                              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>KEY_INSIGHTS</span>
+                              <span className="text-xs font-bold uppercase tracking-wide">Key insights</span>
                             </div>
                             <ul className="space-y-1">
                               {msg.insights.map((insight, idx) => (
@@ -191,7 +194,7 @@ export default function AssistantPage() {
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-[var(--accent)]">
                               <Zap size={14} />
-                              <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>ACTIONS_REQ</span>
+                              <span className="text-xs font-bold uppercase tracking-wide">Next actions</span>
                             </div>
                             <ul className="space-y-1">
                               {msg.recommendations.map((rec, idx) => (
@@ -211,11 +214,10 @@ export default function AssistantPage() {
 
               {loading && (
                 <div className="flex flex-col items-start gap-2">
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-3)', letterSpacing: '0.1em' }}>PROCESSING_REQUEST</span>
-                  <div className="card h-12 flex items-center gap-2 px-4 border-dashed animate-pulse">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0s' }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0.4s' }} />
+                  <span className="text-xs font-medium text-[var(--text-3)]">Notable</span>
+                  <div className="flex h-12 items-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.04] px-4 text-sm text-[var(--text-2)]">
+                    <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
+                    Checking your shop data...
                   </div>
                 </div>
               )}
@@ -231,8 +233,8 @@ export default function AssistantPage() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Query global inventory, sales patterns, or projections..."
-                className="input w-full h-16 pl-14 pr-20 text-lg border-2"
+                placeholder="Ask about stock, sales, profit, or customers..."
+                className="input w-full h-14 md:h-16 pl-12 md:pl-14 pr-20 text-base md:text-lg border-2"
                 style={{ borderColor: input.length > 0 ? 'var(--accent)' : 'var(--border)' }}
                 disabled={loading}
               />
@@ -250,31 +252,34 @@ export default function AssistantPage() {
           </div>
 
           {/* Sidebar Insights (Static suggestions) */}
-          <div className="hidden lg:flex w-72 flex-col gap-6">
+          <div className="hidden lg:flex flex-col gap-6">
             <div className="card border-dashed">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles size={16} color="var(--accent)" />
-                <h3 style={{ fontSize: '0.9rem' }}>Suggested Strategy</h3>
+                <h3 style={{ fontSize: '0.9rem' }}>Try asking</h3>
               </div>
               <div className="space-y-4">
                 <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
-                    &quot;Sales for **Indomie** peak between 4 PM - 7 PM. Consider running a bundle deal on eggs.&quot;
+                    Which items should I avoid restocking this week?
                   </p>
                 </div>
                 <div className="p-3 bg-[var(--bg-3)] rounded-[var(--radius)]">
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', lineHeight: 1.4 }}>
-                    &quot;Your cash liquidity is high. Optimal time for a total stock refresh.&quot;
+                    Which products are bringing the most money?
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="card group hover:border-[var(--info)] transition-colors">
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', marginBottom: '0.5rem' }}>SYSTEM_STATUS</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-3)]">Assistant status</p>
               <div className="flex items-center justify-between">
-                <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Sync Health</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>99.9%</span>
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Wifi size={14} />
+                  Backend
+                </span>
+                <span style={{ color: 'var(--accent)', fontWeight: 800 }}>Online</span>
               </div>
             </div>
           </div>
