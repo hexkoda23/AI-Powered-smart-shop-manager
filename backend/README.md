@@ -1,29 +1,40 @@
-# Shop Management System - Backend
+# Notable AI Shop Manager - Backend
 
-FastAPI backend for the AI-Powered Shop Management System.
+FastAPI + SQLAlchemy backend. Supports SQLite for local development and PostgreSQL for Railway/cloud deployments.
 
-## Setup
+## Local Development
 
-1. Install dependencies:
 ```bash
 pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-2. Create a `.env` file from `.env.example`:
-```bash
-cp .env.example .env
+The default `.env` uses SQLite, so local development needs no database setup.
+
+API docs are available at `http://localhost:8000/docs`.
+
+## Railway Deployment
+
+1. Push this repo to GitHub.
+2. Create a Railway project and connect the GitHub repo.
+3. Add a PostgreSQL plugin to the Railway project.
+4. In the backend service variables, set:
+
+```text
+DATABASE_URL=${{ Postgres.DATABASE_URL }}
+GROQ_API_KEY=<your key from console.groq.com>
 ```
 
-3. Add your Groq API key to `.env`:
-```
-GROQ_API_KEY=your_key_here
-```
+Railway will redeploy after variable changes. Startup logs should show:
 
-4. Run the server:
-```bash
-uvicorn app.main:app --reload --port 8000
+```text
+Database tables ready.
+Application startup complete.
 ```
 
-The API will be available at `http://localhost:8000`
+## Environment Variables
 
-API documentation: `http://localhost:8000/docs`
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | SQLite or PostgreSQL URL. Railway can set this automatically. |
+| `GROQ_API_KEY` | AI API key from https://console.groq.com. |

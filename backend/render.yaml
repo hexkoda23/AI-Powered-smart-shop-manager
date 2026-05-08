@@ -1,3 +1,4 @@
+# render.yaml is kept for reference; Railway is the recommended host now.
 services:
   - type: web
     name: notable-ai-backend
@@ -6,9 +7,7 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
-      - key: FIREBASE_CONFIG_JSON
+      - key: DATABASE_URL
         sync: false
-      - key: notable
-        sync: false
-      - key: OPENAI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
